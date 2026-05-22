@@ -1,0 +1,3 @@
+[console_scripts]
+deepracer_navigation_node = deepracer_navigation_pkg.deepracer_navigation_node:main
+

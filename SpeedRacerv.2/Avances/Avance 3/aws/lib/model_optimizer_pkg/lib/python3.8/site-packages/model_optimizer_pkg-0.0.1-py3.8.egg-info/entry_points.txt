@@ -1,0 +1,3 @@
+[console_scripts]
+model_optimizer_node = model_optimizer_pkg.model_optimizer_node:main
+
