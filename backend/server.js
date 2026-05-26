@@ -2,15 +2,24 @@
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { startVehicle, stopVehicle, manualDrive, initSession, getVideoStream } from "./vehicleControl.js";
 
+dotenv.config();
+
 const app = express();
+
+const PORT = process.env.PORT || 5001; 
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+
 app.disable("etag");
 app.disable("x-powered-by");
 
 app.use(
   cors({
-    origin: "*",
+    origin: ALLOWED_ORIGIN,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "X-CSRF-Token"],
   })
@@ -42,10 +51,9 @@ app.post("/api/manual_drive", async (req, res) => {
     const { init, angle, throttle, max_speed } = req.body || {};
 
     if (init) {
-      // init: preparar vehículo al modo manual y habilitar, SIN moverlo
       console.log("▶️ /api/manual_drive init -> preparando vehículo para control manual...");
       try {
-        await startVehicle(); // startVehicle ya no hace movimiento automático
+        await startVehicle();
         return res.json({ message: "Modo manual activado y vehículo habilitado (esperando comandos)" });
       } catch (err) {
         console.error("Error al activar modo manual:", err);
@@ -53,7 +61,6 @@ app.post("/api/manual_drive", async (req, res) => {
       }
     }
 
-    // Para comandos normales requerimos parámetros normalizados
     if (angle === undefined || throttle === undefined || max_speed === undefined) {
       return res.status(400).json({ error: "Faltan parámetros: angle, throttle o max_speed" });
     }
@@ -92,12 +99,11 @@ app.get("/api/video_stream", async (req, res) => {
       "X-Content-Type-Options": "nosniff",
     });
 
-    // EL MÉTODO CORRECTO PARA MJPEG
     vehicleStream.pipe(res);
 
     res.on("close", () => {
       console.log("🔌 Cliente cerró el stream");
-      try { vehicleStream.destroy(); } catch {}
+      try { vehicleStream.destroy(); } catch { }
     });
 
   } catch (err) {
@@ -109,7 +115,6 @@ app.get("/api/video_stream", async (req, res) => {
   }
 });
 
-const PORT = 5002;
 app.listen(PORT, "0.0.0.0", () =>
   console.log(`Backend activo en http://0.0.0.0:${PORT}`)
 );
