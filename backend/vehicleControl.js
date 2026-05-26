@@ -1,15 +1,18 @@
 // backend/vehicleControl.js
 import http from "http";
 import https from "https";
+import dotenv from "dotenv";
 import { URLSearchParams } from "url";
+
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 // ===================== CONFIG =====================
 const USE_HTTPS = false;
 const CLIENT = USE_HTTPS ? https : http;
-const HOST = "localhost"; // dirección del servidor del vehículo
-const PORT = 5001; // puerto del servidor del vehículo
+const HOST = process.env.HOST || "localhost"; // dirección del servidor del vehículo
+const PORT = process.env.PORT || 5001; // puerto del servidor del vehículo
 const LOGIN_PATH = "/login";
-const PASSWORD = "48AW5fAB"; // ⚠️ cambia esto
+const PASSWORD = process.env.PASSWORD;
 // Nota: ya no usamos MOVE_INTERVAL_MS / MOVE_DURATION_MS en startVehicle
 // porque NO queremos que startVehicle provoque movimiento por sí mismo.
 
