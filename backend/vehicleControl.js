@@ -4,7 +4,7 @@ import https from "https";
 import dotenv from "dotenv";
 import { URLSearchParams } from "url";
 
-dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config();
 
 // ===================== CONFIG =====================
 const USE_HTTPS = false;
