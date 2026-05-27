@@ -898,4 +898,75 @@ journalctl -u sshd -f
 
 ---
 
-*Guía creada para el proyecto AWS DeepRacer STEAM Agent.*
+## Anexo: Sistema RAG (Generación Aumentada por Recuperación)
+
+ El sistema RAG permite hacer preguntas en lenguaje natural sobre los manuales del aula STEAM y obtener respuestas basadas en el contenido de los documentos.
+
+ ### Requisitos
+
+ - Python 3.10 o superior
+ - Ollama instalado y corriendo con el modelo descargado
+ - Dependencias listadas en `RAG/requirements.txt`
+
+ ### Instalación
+
+ 1. Instalar las dependencias de Python:
+
+ ```bash
+ pip install -r RAG/requirements.txt
+ ```
+
+ 2. Configurar el archivo `.env`:
+
+ ```bash
+ cp RAG/.env.example RAG/.env
+ ```
+
+ 3. Editar `RAG/.env` si es necesario para cambiar el modelo o URL de Ollama.
+
+ ### Configuración
+
+ El archivo `.env` contiene:
+
+ - `OLLAMA_MODEL`: Modelo a usar (por defecto `qwen3.5:9b` para desarrollo)
+ - `OLLAMA_BASE_URL`: URL de la API de Ollama (por defecto `http://localhost:11434/v1`)
+
+ ### Indexación
+
+ Ejecutar el indexador para crear el índice FAISS:
+
+ ```bash
+ python RAG/indexador.py
+ ```
+
+ Esto procesará todos los archivos `.md` del directorio `RAG/` y creará el índice en `RAG/faiss_index/`. La primera ejecución tarda 1-3 minutos (descarga del modelo de embeddings).
+
+ ### Consulta
+
+ Hacer preguntas al agente RAG:
+
+ ```bash
+ python RAG/agente.py --pregunta "¿Cómo calibrar el escáner 3D?"
+ ```
+
+ O de forma interactiva:
+
+ ```bash
+ python RAG/agente.py
+ ```
+
+ ### Cambio de modelo
+
+ Para cambiar el modelo de Ollama, editar la variable `OLLAMA_MODEL` en `.env`. Por ejemplo, para producción en DeepRacer:
+
+ ```
+ OLLAMA_MODEL=qwen3.6:35b-a3b-q4_K_M
+ ```
+
+ Asegurarse de que Ollama esté corriendo en el dispositivo antes de consultar.
+
+ ### Nota sobre DeepRacer
+
+ Cuando migran la solución al DeepRacer, usar el modelo `qwen3.6:35b-a3b-q4_K_M` (más potente) y verificar que Ollama esté corriendo en el vehículo. El sistema funciona completamente offline una vez instaladas las dependencias.
+
+ *Guía creada para el proyecto AWS DeepRacer STEAM Agent.*
