@@ -175,8 +175,8 @@ export async function getVideoStream() {
 
   return new Promise((resolve, reject) => {
     const opts = {
-      hostname: "10.203.139.55",
-      port: 443,
+      hostname: HOST,
+      port: PORT,
       path: "/route?topic=/camera_pkg/display_mjpeg&width=480&height=360",
       method: "GET",
       rejectUnauthorized: false, // IMPORTANTE: certificado inseguro
