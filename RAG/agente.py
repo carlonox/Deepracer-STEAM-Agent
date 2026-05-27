@@ -111,6 +111,13 @@ def consultar_ollama(messages: list[dict], model: str, base_url: str) -> str:
     Returns:
         Respuesta generada por el modelo
     """
+    # Sanitizar URL: eliminar trailing colon y normalizar
+    base_url = base_url.rstrip('/:')
+    if not base_url.endswith('/v1'):
+        base_url = base_url + '/v1'
+    
+    logger.info(f"Conectando a Ollama: {base_url} modelo={model}")
+    
     client = OpenAI(
         base_url=base_url,
         api_key="ollama"
@@ -123,7 +130,20 @@ def consultar_ollama(messages: list[dict], model: str, base_url: str) -> str:
         max_tokens=1024
     )
     
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    
+    # Manejar respuesta vacía o None
+    if not content or content.strip() == "":
+        logger.warning("Ollama devolvió respuesta vacía")
+        logger.info(f"Response raw: {response.choices[0].message}")
+        return ("El modelo devolvió una respuesta vacía. "
+                "Esto puede ocurrir si el modelo no está correctamente descargado "
+                "o si el prompt supera el contexto máximo del modelo. "
+                "Verifica: 1) 'ollama list' muestra el modelo, "
+                "2) 'ollama pull {model}' para descargarlo, "
+                "3) El modelo es compatible con chat.")
+    
+    return content
 
 
 def main():
