@@ -10,7 +10,7 @@ dotenv.config();
 const USE_HTTPS = false;
 const CLIENT = USE_HTTPS ? https : http;
 const HOST = process.env.HOST || "localhost"; // dirección del servidor del vehículo
-const PORT = process.env.PORT || 5001; // puerto del servidor del vehículo
+const PORT = process.env.AWS_PORT || 5001; // puerto del servidor del vehículo
 const LOGIN_PATH = "/login";
 const PASSWORD = process.env.PASSWORD;
 // Nota: ya no usamos MOVE_INTERVAL_MS / MOVE_DURATION_MS en startVehicle
