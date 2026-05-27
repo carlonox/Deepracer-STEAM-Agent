@@ -931,6 +931,10 @@ journalctl -u sshd -f
  - `OLLAMA_MODEL`: Modelo a usar (por defecto `qwen3.5:9b` para desarrollo)
  - `OLLAMA_BASE_URL`: URL de la API de Ollama (por defecto `http://localhost:11434/v1`)
 
+ > ⚠️ **Importante**: La URL no debe tener dos puntos (`:`) ni barra (`/`) al final.
+ >   ✅ Correcto: `http://localhost:11434/v1`
+ >   ❌ Incorrecto: `http://localhost:11434:/v1` o `http://localhost:11434/v1/`
+
  ### Indexación
 
  Ejecutar el indexador para crear el índice FAISS:
@@ -969,4 +973,14 @@ journalctl -u sshd -f
 
  Cuando migran la solución al DeepRacer, usar el modelo `qwen3.6:35b-a3b-q4_K_M` (más potente) y verificar que Ollama esté corriendo en el vehículo. El sistema funciona completamente offline una vez instaladas las dependencias.
 
- *Guía creada para el proyecto AWS DeepRacer STEAM Agent.*
+ ### Solución de problemas
+
+| Problema | Causa probable | Solución |
+|----------|---------------|----------|
+| Respuesta vacía | URL mal formada en `.env` (doble colon `:`) | Verificar `OLLAMA_BASE_URL=http://localhost:11434/v1` (sin `:` al final) |
+| Respuesta vacía | Modelo no descargado o nombre incorrecto | Ejecutar `ollama pull qwen3.5:9b` y `ollama list` para confirmar |
+| Error de conexión | Ollama no está corriendo | Ejecutar `ollama serve` en otra terminal |
+| Error de conexión | Puerto incorrecto | Ollama usa `11434` por defecto |
+| El índice no existe | No se ejecutó el indexador | Ejecutar `python RAG/indexador.py` primero |
+
+*Guía creada para el proyecto AWS DeepRacer STEAM Agent.*
