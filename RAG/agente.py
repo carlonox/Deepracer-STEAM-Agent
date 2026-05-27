@@ -6,6 +6,7 @@ Carga el índice FAISS y consulta Ollama para respuestas en español.
 
 import os
 import sys
+import re
 import argparse
 import logging
 from pathlib import Path
@@ -123,19 +124,40 @@ def consultar_ollama(messages: list[dict], model: str, base_url: str) -> str:
         api_key="ollama"
     )
     
+    extra_kwargs = {}
+    try:
+        extra_kwargs["extra_body"] = {
+            "enable_thinking": False,
+            "reasoning_effort": 0
+        }
+    except Exception:
+        pass
+    
     response = client.chat.completions.create(
         model=model,
         messages=messages,
         temperature=0.1,
-        max_tokens=1024
+        max_tokens=1024,
+        **extra_kwargs
     )
     
-    content = response.choices[0].message.content
+    msg = response.choices[0].message
+    content = msg.content
     
-    # Manejar respuesta vacía o None
+    # Si content viene vacío pero hay reasoning, extraer la respuesta del razonamiento
+    if (not content or content.strip() == "") and hasattr(msg, 'reasoning') and msg.reasoning:
+        reasoning = msg.reasoning
+        logger.info("Content vacío, extrayendo respuesta desde reasoning...")
+        parsed = _extraer_respuesta_de_reasoning(reasoning)
+        if parsed:
+            return parsed
+        # Fallback: devolver el razonamiento completo como diagnóstico
+        logger.warning("No se pudo extraer respuesta del reasoning")
+        return reasoning
+    
+    # Manejar respuesta vacía sin reasoning
     if not content or content.strip() == "":
-        logger.warning("Ollama devolvió respuesta vacía")
-        logger.info(f"Response raw: {response.choices[0].message}")
+        logger.warning("Ollama devolvió respuesta vacía (sin reasoning)")
         return ("El modelo devolvió una respuesta vacía. "
                 "Esto puede ocurrir si el modelo no está correctamente descargado "
                 "o si el prompt supera el contexto máximo del modelo. "
@@ -144,6 +166,50 @@ def consultar_ollama(messages: list[dict], model: str, base_url: str) -> str:
                 "3) El modelo es compatible con chat.")
     
     return content
+
+
+def _extraer_respuesta_de_reasoning(reasoning: str) -> str:
+    """
+    Extrae la respuesta final del campo 'reasoning' de modelos Qwen3.
+    
+    Qwen3 pone todo el thinking process en 'reasoning' y deja 'content' vacío.
+    La respuesta final suele aparecer después del paso "Refine the Response".
+    """
+    lineas = reasoning.split('\n')
+    lineas_respuesta = []
+    capturando = False
+    
+    patron_inicio = re.compile(r'^\s*\d+\.\s*\*\*Refine the Response')
+    patron_fin = re.compile(r'^\s*\d+\.\s*\*\*Final Review')
+    
+    for linea in lineas:
+        if not capturando:
+            if patron_inicio.match(linea):
+                capturando = True
+                # saltar la línea del encabezado
+                continue
+            else:
+                continue  # seguir buscando
+        
+        if capturando:
+            if patron_fin.match(linea):
+                break
+            # Quitar bullet points markdown
+            linea_limpia = re.sub(r'^\s*\*\s+', '', linea)
+            lineas_respuesta.append(linea_limpia)
+    
+    if lineas_respuesta:
+        resultado = '\n'.join(lineas_respuesta).strip()
+        if resultado:
+            return resultado
+    
+    # Fallback: último bloque sustancial de texto
+    bloques = re.split(r'\n\s*\n', reasoning)
+    bloques_sustanciales = [b.strip() for b in bloques if len(b.strip()) > 100]
+    if bloques_sustanciales:
+        return bloques_sustanciales[-1]
+    
+    return reasoning  # último recurso: devolver el reasoning completo
 
 
 def main():
