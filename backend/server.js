@@ -11,7 +11,7 @@ dotenv.config();
 
 const app = express();
 
-const PORT = process.env.PORT || 5001; 
+const PORT = process.env.PORT || 5002; 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 
 app.disable("etag");
