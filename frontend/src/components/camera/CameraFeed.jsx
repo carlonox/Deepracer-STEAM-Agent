@@ -1,10 +1,12 @@
 import { useRef, useState, useEffect } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
+
 export default function CameraFeed() {
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const cameraUrl = `http://${window.location.hostname}:8080/stream?topic=/camera_pkg/display_mjpeg&width=1280&height=720`;
+  const AWS_HOST = import.meta.env.VITE_AWS_HOST || "localhost";
+  const cameraUrl = `http://${AWS_HOST}:8080/stream?topic=/camera_pkg/display_mjpeg&width=1280&height=720`;
 
   useEffect(() => {
     const handleFullscreenChange = () => {
