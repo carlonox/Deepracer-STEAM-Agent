@@ -1,5 +1,4 @@
 // backend/vehicleControl.js
-import http from "http";
 import https from "https";
 import dotenv from "dotenv";
 import { URLSearchParams } from "url";
@@ -7,24 +6,24 @@ import { URLSearchParams } from "url";
 dotenv.config();
 
 // ===================== CONFIG =====================
-const USE_HTTPS = false;
-const CLIENT = USE_HTTPS ? https : http;
-const HOST = process.env.HOST || "localhost"; // dirección del servidor del vehículo
-const PORT = process.env.AWS_PORT || 5001; // puerto del servidor del vehículo
+const HOST = process.env.HOST;
+const PORT = process.env.AWS_PORT;
 const LOGIN_PATH = "/login";
 const PASSWORD = process.env.PASSWORD;
-// Nota: ya no usamos MOVE_INTERVAL_MS / MOVE_DURATION_MS en startVehicle
-// porque NO queremos que startVehicle provoque movimiento por sí mismo.
+
+// Extraído para no repetir la cadena en múltiples lugares
+const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
+
 
 // ===================== HELPERS =====================
 function requestOnce(options, body = null) {
   return new Promise((resolve, reject) => {
-    const req = CLIENT.request(options, (res) => {
+    const req = https.request(options, (res) => {
       let data = "";
       res.on("data", (chunk) => (data += chunk));
       res.on("end", () => resolve({ res, data }));
     });
-    req.on("error", (err) => reject(err));
+    req.on("error", reject);
     if (body) req.write(body);
     req.end();
   });
@@ -42,22 +41,20 @@ async function findCsrf() {
     port: PORT,
     path: LOGIN_PATH,
     method: "GET",
-    headers: { Accept: "text/html", "User-Agent": "Node-CSRF-Detector" },
+    rejectUnauthorized: false,
+    headers: { Accept: "text/html", "User-Agent": USER_AGENT },
   };
+  
   const { res: getRes, data: html } = await requestOnce(getOpts);
   const setCookie = getRes.headers["set-cookie"] || [];
-  // intenta extraer CSRF (si hay)
   const csrfMatch = html && (html.match(/name=["']csrf_token["']\s+value=["']([^"']+)["']/i) || html.match(/<meta[^>]*name=["']csrf-token["'][^>]*content=["']([^"']+)["'][^>]*>/i));
-  const csrf = csrfMatch ? csrfMatch[1] : null;
-  return { csrf, setCookie };
+  
+  return { csrf: csrfMatch ? csrfMatch[1] : null, setCookie };
 }
 
 async function authenticate() {
   const { csrf, setCookie } = await findCsrf();
-  if (!csrf) {
-    // Si no existe CSRF tal vez el servidor no lo requiere: igual devolvemos cookies
-    return { csrf: null, cookieHeader: cookieHeaderFromSetCookie(setCookie) };
-  }
+  if (!csrf) return { csrf: null, cookieHeader: cookieHeaderFromSetCookie(setCookie) };
 
   const cookieHeader = cookieHeaderFromSetCookie(setCookie);
   const form = new URLSearchParams({ csrf_token: csrf, password: PASSWORD }).toString();
@@ -67,27 +64,26 @@ async function authenticate() {
     port: PORT,
     path: LOGIN_PATH,
     method: "POST",
+    rejectUnauthorized: false,
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       "Content-Length": Buffer.byteLength(form),
       Cookie: cookieHeader,
-      "User-Agent": "Node-CSRF-Detector",
+      "User-Agent": USER_AGENT,
       "X-CSRF-Token": csrf,
     },
   };
 
   const { res: postRes } = await requestOnce(postOpts, form);
-  const postSetCookie = postRes.headers["set-cookie"] || [];
-  const allCookies = [...setCookie, ...postSetCookie];
+  const allCookies = [...setCookie, ...(postRes.headers["set-cookie"] || [])];
+  
   return { csrf, cookieHeader: cookieHeaderFromSetCookie(allCookies) };
 }
 
-
-// sesión guardada
+// ===================== SESSION =====================
 let session = null;
 
 async function ensureSession() {
-  // si la sesión expiró, reautenticar
   if (!session) session = await authenticate();
   return session;
 }
@@ -96,7 +92,7 @@ export async function initSession() {
   session = await authenticate();
 }
 
-
+// ===================== POST / PUT JSON =====================
 async function postJson(path, jsonObj) {
   let { csrf, cookieHeader } = await ensureSession();
   const jsonData = JSON.stringify(jsonObj);
@@ -105,42 +101,46 @@ async function postJson(path, jsonObj) {
     hostname: HOST,
     port: PORT,
     path,
-    method: "POST",
+    method: "PUT", // Mantenemos PUT porque el original lo exigía así
+    rejectUnauthorized: false,
     headers: {
-      "Content-Type": "application/json",
+      Accept: "*/*",
+      "Accept-Language": "es,es-ES;q=0.9,en;q=0.8",
+      "Content-Type": "application/json;charset=UTF-8",
       "Content-Length": Buffer.byteLength(jsonData),
+      Origin: `https://${HOST}`,
+      Referer: `https://${HOST}/home`,
+      "X-Requested-With": "XMLHttpRequest",
       Cookie: cookieHeader,
-      "User-Agent": "Node-CSRF-Detector",
+      "User-Agent": USER_AGENT,
       ...(csrf ? { "X-CSRF-Token": csrf } : {}),
     },
   };
 
   try {
-    return await requestOnce(opts, jsonData);
+    const response = await requestOnce(opts, jsonData);
+    if (response.res.statusCode === 401 || response.res.statusCode === 403) {
+      throw new Error("Session expired");
+    }
+    return response;
   } catch (err) {
-    console.warn("⚠️ Error con sesión actual, reautenticando...", err);
-    session = await authenticate();    // renovar
-    csrf = session.csrf;
-    cookieHeader = session.cookieHeader;
-
-    // reintentar
+    console.warn("⚠️ Error con sesión actual, reautenticando...");
+    session = await authenticate();
+    
     const retryOpts = {
       ...opts,
       headers: {
         ...opts.headers,
-        Cookie: cookieHeader,
-        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+        Cookie: session.cookieHeader,
+        ...(session.csrf ? { "X-CSRF-Token": session.csrf } : {}),
       },
     };
-
+    
     return await requestOnce(retryOpts, jsonData);
   }
 }
 
-
 // ===================== ACCIONES =====================
-
-// startVehicle: SOLO prepara vehículo (modo manual y habilita start), NO envía movimiento
 export async function startVehicle() {
   console.log("▶️ Poniendo drive_mode = manual ...");
   await postJson("/api/drive_mode", { drive_mode: "manual" });
@@ -148,21 +148,16 @@ export async function startVehicle() {
   console.log("▶️ Poniendo start_stop = start ...");
   await postJson("/api/start_stop", { start_stop: "start" });
 
-  console.log("✅ Vehículo listo (no hay movimiento automático).");
+  console.log("✅ Vehículo listo.");
 }
 
-// stopVehicle: para el vehículo
 export async function stopVehicle() {
   console.log("🛑 Enviando start_stop = stop ...");
   await postJson("/api/start_stop", { start_stop: "stop" });
   console.log("✅ Vehículo detenido.");
 }
 
-// manualDrive: envía valores ya normalizados en [-1,1] para angle y throttle, max_speed 0..1
 export async function manualDrive(angle, throttle, max_speed) {
-  // En este punto asumimos que `angle` y `throttle` ya están en [-1,1] y max_speed en [0,1]
-  // Si no lo están, el backend/vehicle server rechazará.
-  // Hacemos una validación ligera por si acaso:
   const a = Math.max(-1, Math.min(1, angle));
   const t = Math.max(-1, Math.min(1, throttle));
   const m = Math.max(0, Math.min(1, max_speed));
@@ -170,6 +165,7 @@ export async function manualDrive(angle, throttle, max_speed) {
   await postJson("/api/manual_drive", { angle: a, throttle: t, max_speed: m });
 }
 
+// ===================== VIDEO STREAM =====================
 export async function getVideoStream() {
   let { csrf, cookieHeader } = await ensureSession();
 
@@ -179,13 +175,13 @@ export async function getVideoStream() {
       port: PORT,
       path: "/route?topic=/camera_pkg/display_mjpeg&width=480&height=360",
       method: "GET",
-      rejectUnauthorized: false, // IMPORTANTE: certificado inseguro
+      rejectUnauthorized: false,
       headers: {
         Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
-        Cookie: cookieHeader,    // mantener sesión
-        "User-Agent": "Mozilla/5.0",
+        Cookie: cookieHeader,
+        "User-Agent": USER_AGENT,
         ...(csrf ? { "X-CSRF-Token": csrf } : {}),
       },
     };
@@ -193,21 +189,17 @@ export async function getVideoStream() {
     const req = https.request(opts, (res) => {
       if (res.statusCode === 401 || res.statusCode === 403) {
         console.warn("⚠️ Sesión expirada, reautenticando…");
-
         authenticate()
           .then(() => getVideoStream().then(resolve).catch(reject))
           .catch(reject);
-
         return;
       }
 
       if (res.statusCode !== 200) {
-        return reject(
-          new Error(`Error obteniendo stream: ${res.statusCode}`)
-        );
+        return reject(new Error(`Error obteniendo stream: ${res.statusCode}`));
       }
 
-      resolve(res); // devolvemos el stream directo
+      resolve(res);
     });
 
     req.on("error", reject);
