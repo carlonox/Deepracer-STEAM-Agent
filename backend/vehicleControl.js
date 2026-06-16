@@ -92,8 +92,8 @@ export async function initSession() {
   session = await authenticate();
 }
 
-// ===================== POST / PUT JSON =====================
-async function postJson(path, jsonObj) {
+// ===================== PUT JSON =====================
+async function putJson(path, jsonObj) {
   let { csrf, cookieHeader } = await ensureSession();
   const jsonData = JSON.stringify(jsonObj);
 
@@ -101,7 +101,7 @@ async function postJson(path, jsonObj) {
     hostname: HOST,
     port: PORT,
     path,
-    method: "PUT", // Mantenemos PUT porque el original lo exigía así
+    method: "PUT",
     rejectUnauthorized: false,
     headers: {
       Accept: "*/*",
@@ -143,17 +143,17 @@ async function postJson(path, jsonObj) {
 // ===================== ACCIONES =====================
 export async function startVehicle() {
   console.log("▶️ Poniendo drive_mode = manual ...");
-  await postJson("/api/drive_mode", { drive_mode: "manual" });
+  await putJson("/api/drive_mode", { drive_mode: "manual" });
 
   console.log("▶️ Poniendo start_stop = start ...");
-  await postJson("/api/start_stop", { start_stop: "start" });
+  await putJson("/api/start_stop", { start_stop: "start" });
 
   console.log("✅ Vehículo listo.");
 }
 
 export async function stopVehicle() {
   console.log("🛑 Enviando start_stop = stop ...");
-  await postJson("/api/start_stop", { start_stop: "stop" });
+  await putJson("/api/start_stop", { start_stop: "stop" });
   console.log("✅ Vehículo detenido.");
 }
 
@@ -162,7 +162,7 @@ export async function manualDrive(angle, throttle, max_speed) {
   const t = Math.max(-1, Math.min(1, throttle));
   const m = Math.max(0, Math.min(1, max_speed));
 
-  await postJson("/api/manual_drive", { angle: a, throttle: t, max_speed: m });
+  await putJson("/api/manual_drive", { angle: a, throttle: t, max_speed: m });
 }
 
 // ===================== VIDEO STREAM =====================
