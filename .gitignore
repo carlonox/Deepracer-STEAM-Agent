@@ -31,6 +31,48 @@ AgentWorkshop/
 # Hermes internal data (API keys, config, session data)
 hermes/data/
 hermes/.hermes/
+# Hermes internal files (NO subir)
+hermes/.hermes_history
+hermes/.install_method
+hermes/.npm/
+hermes/.gitignore
+hermes/auth.json
+hermes/auth.lock
+hermes/bin/
+hermes/cache/
+hermes/config.yaml
+hermes/config.yaml.bak*
+hermes/home/
+hermes/lsp/
+hermes/models_dev_cache.json
+hermes/ollama_cloud_models_cache.json
+hermes/pastes/
+hermes/provider_models_cache.json
+hermes/state.db
+hermes/state.db-shm
+hermes/state.db-wal
+hermes/skills/.bundled_manifest
+hermes/skills/.curator_state
+hermes/skills/.usage.json
+hermes/skills/.usage.json.lock
+hermes/skills/apple/
+hermes/skills/autonomous-ai-agents/
+hermes/skills/creative/
+hermes/skills/data-science/
+hermes/skills/devops/
+hermes/skills/dogfood/
+hermes/skills/email/
+hermes/skills/github/
+hermes/skills/media/
+hermes/skills/mlops/
+hermes/skills/note-taking/
+hermes/skills/productivity/
+hermes/skills/research/
+hermes/skills/smart-home/
+hermes/skills/social-media/
+hermes/skills/software-development/
+hermes/skills/yuanbao/
+hermes/memories/MEMORY.md.lock
 
 # Hermes temporary workspace
 hermes/workspace/*
