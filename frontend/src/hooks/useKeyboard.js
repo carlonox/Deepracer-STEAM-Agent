@@ -37,13 +37,13 @@ export default function useKeyboard(enabled, maxSpeed) {
       else if (isDown) throttle = 100;
       else if (isLeft) {
         angle = -45;
-        throttle = -100;
+        throttle = 0;
       } else if (isRight) {
         angle = 45;
-        throttle = -100;
+        throttle = 0;
       }
     }
-
+    console.log(`⌨️ Calculated command from keys [${[...keys].join(', ')}]: Angle=${angle}° Throttle=${throttle}%`);
     return { angle, throttle };
   };
 

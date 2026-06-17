@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { startVehicle, stopVehicle, manualDrive, initSession, getVideoStream } from "./vehicleControl.js";
+import { Client as SSHClient } from "ssh2";
 
 dotenv.config();
 
@@ -83,6 +84,44 @@ app.post("/api/manual_drive", async (req, res) => {
     console.warn("⚠️ No se pudo inicializar sesión aún. Se intentará más tarde.", err);
   }
 })();
+
+app.post("/api/exec", async (req, res) => {
+  const { command } = req.body || {};
+  if (!command) {
+    return res.status(400).json({ error: "Falta el campo 'command'" });
+  }
+
+  const ssh = new SSHClient();
+  const stdout = [];
+  const stderr = [];
+
+  ssh.on("ready", () => {
+    ssh.exec(command, (err, stream) => {
+      if (err) {
+        ssh.end();
+        return res.status(500).json({ error: `SSH exec error: ${err.message}` });
+      }
+      stream.on("data", (data) => stdout.push(data.toString()));
+      stream.stderr.on("data", (data) => stderr.push(data.toString()));
+      stream.on("close", (code) => {
+        ssh.end();
+        res.json({ stdout: stdout.join(""), stderr: stderr.join(""), exit: code });
+      });
+    });
+  });
+
+  ssh.on("error", (err) => {
+    res.status(500).json({ error: `SSH connection error: ${err.message}` });
+  });
+
+  ssh.connect({
+    host: process.env.HOST,
+    port: parseInt(process.env.SSH_PORT) || 22,
+    username: process.env.SSH_USER,
+    password: process.env.SSH_PASS,
+    readyTimeout: 10000,
+  });
+});
 
 app.get("/api/video_stream", async (req, res) => {
   console.log("📡 Cliente solicitó el stream de video");
