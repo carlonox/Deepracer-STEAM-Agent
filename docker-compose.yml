@@ -1,0 +1,14 @@
+services:
+  hermes:
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    stdin_open: true
+    tty: true
+    network_mode: host
+    volumes:
+      - ./hermes:/opt/data
+      - ./:/workspace
+    working_dir: /workspace
+    environment:
+      - TERM=xterm-256color

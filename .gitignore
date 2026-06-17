@@ -25,5 +25,21 @@ dist-ssr
 .kilo/
 AgentWorkshop/
 
-# Enviroment values
+# Environment values
 .env
+
+# Hermes internal data (API keys, config, session data)
+hermes/data/
+hermes/.hermes/
+
+# Hermes temporary workspace
+hermes/workspace/*
+!hermes/workspace/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Docker
+hermes-data/
