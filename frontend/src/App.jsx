@@ -185,10 +185,10 @@ function App() {
       else if (isDown) throttle = 100;
       else if (isLeft) {
         angle = -45;
-        throttle = -100;
+        throttle = 0;
       } else if (isRight) {
         angle = 45;
-        throttle = -100;
+        throttle = 0;
       }
     }
     

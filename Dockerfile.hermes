@@ -1,2 +1,2 @@
 FROM nousresearch/hermes-agent
-RUN uv pip install paramiko --system
+RUN uv pip install paramiko
