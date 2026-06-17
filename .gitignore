@@ -85,3 +85,9 @@ __pycache__/
 
 # Docker
 hermes-data/
+# Archivos temporales y sensibles adicionales
+*.mp3
+hermes/.cache/
+hermes/.ssh/
+hermes/sessions/
+hermes/memories/*.lock
