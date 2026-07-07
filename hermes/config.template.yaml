@@ -1,0 +1,65 @@
+# Hermes v0.18.0 - Deepracer STEAM Agent
+# CONFIG TEMPLATE — Copia como config.yaml y rellena los valores
+# NUNCA subas config.yaml real a GitHub
+
+model:
+  default: deepseek-v4-flash
+  provider: opencode-go
+  base_url: https://opencode.ai/zen/go/v1
+  api_mode: chat_completions
+
+agent:
+  max_turns: 150
+  verify_on_stop: false
+  verbose: false
+  reasoning_effort: medium
+
+dashboard:
+  host: 0.0.0.0
+  port: 9119
+  basic_auth:
+    username: admin
+    password: "TU_PASSWORD_AQUI"
+    secret: "TU_SECRET_AQUI"
+
+terminal:
+  backend: local
+  cwd: /workspace
+  timeout: 180
+
+memory:
+  memory_enabled: false
+  user_profile_enabled: false
+
+session_reset:
+  mode: none
+
+compression:
+  enabled: true
+  threshold: 0.5
+  target_ratio: 0.2
+  protect_last_n: 20
+  protect_first_n: 3
+
+display:
+  compact: false
+  streaming: true
+  tool_progress: all
+
+web:
+  backend: ddgs
+  use_gateway: false
+
+browser:
+  cloud_provider: local
+  use_gateway: false
+
+tts:
+  use_gateway: false
+
+image_gen:
+  use_gateway: false
+
+plugins:
+  enabled: []
+_config_version: 33

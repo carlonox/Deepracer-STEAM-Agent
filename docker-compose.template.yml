@@ -1,0 +1,24 @@
+# Deepracer STEAM Agent - Docker Compose Template
+# COPIA como docker-compose.yml y rellena los valores
+
+services:
+  hermes:
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    container_name: deepracer-agent
+    restart: unless-stopped
+    ports:
+      - "9999:9119"
+      - "8642:8642"
+    volumes:
+      - ./hermes:/opt/data
+      - ./:/workspace
+    working_dir: /workspace
+    environment:
+      - TERM=xterm-256color
+      - OPENCODE_API_KEY=TU_API_KEY_AQUI
+      - HERMES_DASHBOARD=1
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_KEY=TU_API_KEY_AQUI

@@ -1,65 +1,59 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-.kilo/
-AgentWorkshop/
-
-# Environment values
-.env
-
-# Hermes internal data (API keys, config, session data)
-hermes/data/
-hermes/.hermes/
-# Hermes internal files (NO subir)
-hermes/.hermes_history
-hermes/.install_method
-hermes/.npm/
-hermes/.gitignore
+# === CREDENCIALES Y SECRETOS ===
+hermes/config.yaml
+hermes/.env
+hermes/.env.*
 hermes/auth.json
 hermes/auth.lock
-hermes/bin/
-hermes/cache/
-hermes/config.yaml
-hermes/config.yaml.bak*
-hermes/home/
-hermes/lsp/
-hermes/models_dev_cache.json
-hermes/ollama_cloud_models_cache.json
-hermes/pastes/
-hermes/provider_models_cache.json
+
+# === DOCKER COMPOSE (tiene API keys) ===
+docker-compose.yml
+
+# === ESTADO Y BASE DE DATOS ===
 hermes/state.db
-hermes/state.db-shm
-hermes/state.db-wal
+hermes/state.db*
+hermes/gateway.lock
+hermes/gateway.pid
+hermes/gateway_state.json
+hermes/kanban.db
+hermes/kanban.db.*
+hermes/channel_directory.json
+hermes/models_dev_cache.json
+
+# === DATOS GENERADOS ===
+hermes/cache/
+hermes/sessions/
+hermes/logs/
+hermes/cron/
+hermes/kanban/
+hermes/.cache/
+hermes/.npm/
+hermes/.ssh/
+hermes/.hermes/
+hermes/.local/
+hermes/.playwright/
+hermes/.cua-driver/
+hermes/lazy-packages/
+hermes/home/
+hermes/bin/
+hermes/lsp/
+hermes/pastes/
+hermes/backups/
+hermes/audio_cache/
+hermes/sandboxes/
+hermes/plans/
+hermes/platforms/
+hermes/hooks/
+
+# === SKILLS BUNDLED (no son tuyos, se instalan con Hermes) ===
 hermes/skills/.bundled_manifest
 hermes/skills/.curator_state
 hermes/skills/.usage.json
 hermes/skills/.usage.json.lock
 hermes/skills/apple/
 hermes/skills/autonomous-ai-agents/
+hermes/skills/computer-use/
 hermes/skills/creative/
 hermes/skills/data-science/
-hermes/skills/devops/
 hermes/skills/dogfood/
 hermes/skills/email/
 hermes/skills/github/
@@ -72,22 +66,20 @@ hermes/skills/smart-home/
 hermes/skills/social-media/
 hermes/skills/software-development/
 hermes/skills/yuanbao/
-hermes/memories/MEMORY.md.lock
 
-# Hermes temporary workspace
-hermes/workspace/*
-!hermes/workspace/.gitkeep
+# === ARCHIVOS DE SISTEMA ===
+hermes/.hermes_history
+hermes/.install_method
+hermes/*.bak*
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
+# === NODE ===
+backend/node_modules/
+backend/.env
 
-# Docker
-hermes-data/
-# Archivos temporales y sensibles adicionales
-*.mp3
-hermes/.cache/
-hermes/.ssh/
-hermes/sessions/
-hermes/memories/*.lock
+# === WINDOWS ===
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# === BACKUP TEMPORAL ===
+backup/
