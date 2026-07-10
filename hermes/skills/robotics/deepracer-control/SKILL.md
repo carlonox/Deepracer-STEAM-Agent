@@ -1,7 +1,7 @@
 ---
 name: deepracer-control
-description: "Control AWS DeepRacer robots via SSH, web API, and backend proxy — setup, networking, movement commands, camera streaming, and troubleshooting."
-version: 1.4.0
+description: "Control AWS DeepRacer robots via SSH, web API, and backend proxy — setup, networking, movement commands, camera streaming, LED control, ESP32/KY-037 sound sensor, autonomous exploration with obstacle avoidance, and troubleshooting."
+version: 2.21.0
 author: Hermes Agent
 platforms: [linux, macos, windows]
 metadata:
@@ -31,16 +31,37 @@ End-to-end guide for controlling an AWS DeepRacer robot from Hermes Agent — wh
 ### Key Networking Facts
 
 - **Docker containers usually CANNOT reach Tailscale IPs** of the DeepRacer. They can reach the **LAN IP** if on the same physical network.
-- The **LAN IP** works for SSH (port 22) from Docker. The web API (port 5001) may be firewalled from Docker.
+- The **LAN IP** works for SSH (port 22) and camera stream (port 8080) from Docker. The web API (port 5001) is typically **firewalled** from Docker containers.
 - When Docker can't reach the robot, deploy the **Node.js backend proxy** on the Windows/Linux host and have Hermes call `POST /api/exec`.
+- **Port reachability from Docker**: ✅ SSH (22), ✅ Camera stream (8080), ❌ Web API (5001). Use SSH+paramiko or the backend proxy for control commands.
 
 ## Physical Setup
 
-1. Connect DeepRacer to monitor via HDMI + USB mouse
-2. Connect battery / power bank (minimum 5V/2A)
-3. Power on, wait ~1-2 min for boot
-4. Get IP: run `ip addr show` in a terminal on the monitor, look for `wlan0` or `eth0`
-5. Both robot and computer must be on the **same WiFi network**
+### ⚡ Two Separate Power Systems (CRITICAL)
+
+The DeepRacer has **two independent power systems** — both must be connected for movement:
+
+| System | Powers | Connector | Monitored? |
+|--------|--------|-----------|:----------:|
+| 💻 **Compute** | Ubuntu, ROS2, WiFi, LEDs | USB-C (power bank or wall charger) | ❌ No (standard USB, no data pins) |
+| ⚡ **Motors** | Drive motor + steering servo | **White 2-pin connector** (LiPo battery) | ✅ Via I2C (`/i2c_pkg/battery_level`) |
+
+**Without the LiPo chassis battery connected, the motors have no power** even though the computer boots, the web API returns `{"success": true}`, and the purple LED is on. The wall charger / power bank only powers the computer.
+
+### 🔘 Physical Motor Enable Button
+
+The DeepRacer has a **small push button on the main circuit board** that physically enables the motors. This button must be pressed after boot — it's a hardware safety interlock. Without pressing it, `PUT /api/drive_mode` and `PUT /api/start_stop` return `{"success": true}` but **no power reaches the motors**.
+
+### Setup Steps
+
+1. **Connect both power sources:** USB-C (compute) AND LiPo battery (motors)
+2. **Press the motor enable button** on the main board (small tactile switch near battery connector)
+3. **Connect monitor** via HDMI + USB mouse
+4. **Wait ~1-2 min** for boot — purple LED means compute is ready
+5. **Get IP:** run `ip addr show` in a terminal on the monitor, look for `wlan0` or `eth0`
+6. Both robot and computer must be on the **same WiFi network**
+
+> **🕳️ Pitfall — \"Robot doesn't move\" is usually a power issue first, a software issue second.** If the web API returns `{"success": true}` for all commands but nothing moves, check: (1) Is the LiPo battery connected? (2) Is the motor enable button pressed? Only then debug throttle convention or watchdog loops.
 
 ## Connecting
 
@@ -215,6 +236,8 @@ If you're inside the Docker container and SSH is unstable, an alternative is to 
 
 This distinction saves 10+ minutes of guessing every time.
 
+> **🕳️ Pitfall — SSH channel exhaustion**: Each paramiko `exec_command()` opens a new SSH channel. If you call `exec_command()` repeatedly in a Python loop, you can exhaust the robot's SSH channel limit. Fix: batch multiple commands into a single `exec_command()` using `&&` or `;`, or write a shell script with heredoc.
+
 ### Web API Login Flow (CSRF)
 
 The DeepRacer's web server uses a CSRF-protected login:
@@ -238,7 +261,7 @@ PUT /api/manual_drive { "angle": X, "throttle": Y, "max_speed": Z }  # 3. Move (
 | Field | Range | Description |
 |-------|-------|-------------|
 | `angle` | -1.0 to 1.0 | Negative = left, Positive = right |
-| `throttle` | -1.0 to 1.0 | **Inverted**: negative = forward, positive = reverse |
+| `throttle` | -1.0 to 1.0 | ⚠️ **CONVENTION VARIES — ALWAYS TEST FIRST.** This robot's web API was proven (2026-07-10 session) to use **negative = forward** (throttle=-0.5 goes forward). However, earlier sessions found positive=forward, and the project's own `drive_test.py` uses throttle=+0.7 for forward. The convention can flip between reboots. **Always run a direction test** (`throttle=+0.3` then `throttle=-0.3`, observe which is forward) before assuming. The ROS2 convention (polarity=-1 calibration) is consistently negative=forward. See #1 Pitfall below. |
 | `max_speed` | 0.0 to 1.0 | Speed limit fraction |
 
 ### ⚠️ Watchdog Timer
@@ -247,11 +270,147 @@ The firmware has a **~200ms watchdog**. If no new command arrives within that wi
 
 ### Typical Values for Movement
 
-- Forward straight: `{"angle": 0, "throttle": -0.7, "max_speed": 1.0}`
-- Forward right: `{"angle": 0.5, "throttle": -0.7, "max_speed": 1.0}`
-- Forward left: `{"angle": -0.5, "throttle": -0.7, "max_speed": 1.0}`
-- Reverse: `{"angle": 0, "throttle": 0.5, "max_speed": 0.5}`
-- Stop: `PUT /api/start_stop {"start_stop": "stop"}`
+| Command | angle | throttle | max_speed |
+|---------|:-----:|:--------:|:---------:|
+| Forward (web API) | 0 | **+0.5 to +0.8** | 1.0 |
+| Fast forward | 0 | **+0.8** | 1.0 |
+| Forward right | 0.5 | **+0.5 to +0.7** | 1.0 |
+| Forward left | -0.5 | **+0.5 to +0.7** | 1.0 |
+| Reverse | 0 | **-0.4** | 0.7 |
+| Brake/Stop | 0 | 0.0 | 0.0 |
+
+> ⚠️ The typical values listed above use the **web API convention** (positive = forward), which is confirmed by the project's own `drive_test.py`. However, **on some robots this convention flips after a reboot** (likely due to motor calibration polarity being re-read differently). If the robot goes backward when you expect forward, **test with both +0.3 and -0.3** to determine the current convention. A quick diagnostic:
+> ```bash
+> # Send throttle=+0.3 for 1s, observe direction
+> # Then throttle=-0.3 for 1s
+> # Whichever goes forward is the current convention
+> ```
+> Update the drive daemon's `COMMANDS` dict accordingly. This is a known quirk on this hardware.
+
+### 🔄 Real-Time Drive Daemon
+
+For **interactive real-time control** (rather than pre-scripted sequences), use a drive daemon — a background process on the robot that reads commands from `/tmp/drive_cmd` and maintains the watchdog loop at 30Hz:
+
+```bash
+echo "forward"  > /tmp/drive_cmd    # Advance straight (throttle +0.5)
+echo "fast"     > /tmp/drive_cmd    # Fast forward (throttle +0.8)
+echo "back"     > /tmp/drive_cmd    # Reverse (throttle -0.4)
+echo "left"     > /tmp/drive_cmd    # Turn left (while advancing)
+echo "right"    > /tmp/drive_cmd    # Turn right (while advancing)
+echo "fleft"    > /tmp/drive_cmd    # Forward + sharp left
+echo "fright"   > /tmp/drive_cmd    # Forward + sharp right
+echo "bleft"    > /tmp/drive_cmd    # Reverse + left
+echo "bright"   > /tmp/drive_cmd    # Reverse + right
+echo "brake"    > /tmp/drive_cmd    # Brake (throttle=0)
+echo "stop"     > /tmp/drive_cmd    # Full stop
+```
+
+**How it works:**
+1. Daemon does CSRF login once, enables manual mode, starts motors
+2. Reads `/tmp/drive_cmd` in a 30Hz loop — sends `PUT /api/manual_drive` each cycle
+3. Agent or user just writes to the command file; daemon handles the watchdog
+4. On exit, daemon automatically stops motors
+
+**Start on the robot:**
+```bash
+nohup python3 /tmp/drive-daemon.py > /tmp/drive_daemon.log 2>&1 &
+```
+
+See `scripts/drive-daemon.py` for the implementation.
+
+### 🤖 Autonomous Explorer (Camera + ESP32 + Stuck Detection)
+
+For full **autonomous exploration** with obstacle avoidance and stuck detection, use `scripts/explorer.py` — a self-contained loop that combines camera and sound sensor for reactive navigation:
+
+```bash
+nohup python3 /tmp/explorer.py > /tmp/explorer.log 2>&1 &
+```
+
+#### Navigation Algorithm (v4 — Smart Escape)
+
+The current explorer (`scripts/explorer.py`) uses a **deliberative escape** strategy: backup far, look left, look right via camera, choose the clearest path.
+
+```
+IDLE:
+  📸 Check ALL THREE zones (left / center / right) via analyze_view()
+  ├── Center obstacle detected → BACKUP state (will look for best exit)
+  ├── Only left blocked → FORWARD with slight right bias (+0.3 angle)
+  ├── Only right blocked → FORWARD with slight left bias (-0.3 angle)
+  └── All clear → FORWARD straight (0.0 angle)
+
+FORWARD (0.4s segment):
+  🚗 Drive at throttle=-0.30, current angle bias
+  After 0.4s → stop → IDLE
+
+BACKUP (Smart Escape):
+  ⏪ Reverse at throttle=0.35 for 1.5 seconds
+  👈 Turn left (angle=-0.8, throttle=0) — check camera every ~0.6s
+    ├── If left and center look clear → ESCAPE forward with left bias
+  👉 Turn right (angle=0.8, throttle=0) — check camera every ~0.6s
+    ├── If right and center look clear → ESCAPE forward with right bias
+  🤷 No clear path found → pick the zone with fewest obstacles
+    └── ESCAPE toward best zone
+```
+
+#### Camera Obstacle Detection (3-Zone Analysis)
+
+The `analyze_view(img)` function splits the camera into three vertical zones and checks each independently via OpenCV (4.13.0):
+
+1. **Color detection (HSV)** — Blue objects: `cv2.inRange(hsv, [80, 20, 20], [145, 255, 255])` with threshold > 15% coverage. Uses a **wide range** with saturation > 20 to avoid gray floor false positives while still detecting the blue suitcase in varied lighting.
+2. **Brightness** — Mean pixel value < 80 + std < 25 → dark obstacle close
+3. **Uniformity** — Low std (< 30) + medium brightness (< 140) → large smooth object (suitcase, wall, box) regardless of color
+4. **Edge density** — Canny edges > 20% of ROI → textured obstacle
+
+Previous versions used a tighter range `[95, 60, 40]-[135, 255, 255]` which missed the blue suitcase in some lighting. The wider range with saturation floor of 20 is the tested sweet spot.
+
+#### Stuck Detection (Frame Comparison)
+
+The `check_stuck()` function compares camera frames **after** each 0.4s forward segment:
+
+```python
+snap = urllib.request.urlopen(CAM_URL, timeout=0.1).read()
+img = cv2.imdecode(np.frombuffer(snap, np.uint8), cv2.IMREAD_GRAYSCALE)
+small = cv2.resize(img, (32, 24))  # 32x24 tiny for speed
+diff = cv2.mean(cv2.absdiff(small, frame_prev))[0]
+if diff < 3:
+    consecutive_collisions += 1
+    state = "backup"
+```
+
+**Key:** frame_prev is saved at the END of each successful forward cycle (not at the start), avoiding a slow camera fetch that would block the 0.5s movement timer. The `timeout=0.1` ensures the comparison snapshot returns fast enough to not delay the next cycle.
+
+**⚠️ Pitfall: camera timeout blocks the movement loop.** If the camera snapshot takes 2 seconds (default timeout), the 0.4s forward segment expires before any movement executes. Always use `timeout=0.1` for stuck detection snapshots.
+
+**⚠️ Pitfall: state overwrite bug.** If `check_stuck()` sets `state = "backup"`, the calling `else` block in the forward state MUST check `state` before overwriting it back to `"idle"`:
+```python
+check_stuck()
+if state == "backup":
+    continue  # don't overwrite back to idle!
+```
+
+#### Smart Escape: tuning parameters
+
+| Parameter | v2 (naive) | v4 (smart) | Rationale |
+|-----------|:----------:|:----------:|-----------|
+| Forward throttle | -0.35 | **-0.30** | Slower = safer = more time for camera | 
+| Forward segment | 0.5s | **0.4s** | Shorter = less collision damage |
+| Backup duration | 0.6s | **1.5s** | More reverse distance to fully clear obstacles |
+| Turn-while-backing | 1.2s random | **2.0s looking, camera-guided** | Check left, check right, choose |
+| Camera timeout (analysis) | 1.0s | **1.0s** | OK for idle; for stuck: **0.1s** |
+| Blue HSV range | [95,60,40]-[135,255,255] | **[80,20,20]-[145,255,255]** | Missed suitcase in some lighting |
+
+#### ESP32 Sound Sensor in Navigation
+
+The KY-037 sound sensor has a **critical limitation**: motor noise generates continuous `clap` events (17-47 seconds) that mask real collisions. During autonomous navigation:
+- **Only react to `collision` events** (short, 30-200ms), not `clap` (long, motor noise)
+- With the motor running, `clap` events are almost always false positives
+- For reliable collision detection during movement, a mechanical bumper or ultrasonic sensor is recommended instead
+
+Paired with the brake LED node (for visual feedback):
+```bash
+source /opt/ros/foxy/setup.bash; source /opt/aws/deepracer/lib/setup.bash
+nohup python3 /tmp/brake-led.py > /tmp/brake_led.log 2>&1 &
+```
 
 ## Backend Proxy (Node.js + Express)
 
@@ -346,6 +505,14 @@ Reference file with full details: `references/deepracer-led-control.md`
 
 Reusable script for rainbow animation: `scripts/led-rainbow.sh` (usage: `bash led-rainbow.sh [seconds]`)
 
+Throttle-reactive LED script: `scripts/brake-led.py` — ROS2 node that turns LEDs red when reversing/braking and green when moving forward, by subscribing to `/webserver_pkg/manual_drive`.
+
+Test drive script: `scripts/test-drive.py` — full movement sequence through the web API (forward → brake → reverse → turn left → turn right → stop). Run on the robot via `python3 /tmp/test-drive.py`.
+
+Real-time drive daemon: `scripts/drive-daemon.py` — reads commands from `/tmp/drive_cmd` and maintains a continuous drive loop at 30Hz for interactive control. Start via `nohup python3 /tmp/drive-daemon.py > /tmp/drive_daemon.log 2>&1 &`.
+
+Combined drive + ESP32 monitor: `scripts/drive-and-listen.py` — drives the robot slowly while reading the KY-037 sound sensor on the ESP32. Useful for detecting motor noise, collisions, or environmental sounds during movement.
+
 ### Via REST API
 
 The robot's web interface (port 5001) exposes dedicated LED endpoints found in the `bundle.js`:
@@ -389,6 +556,69 @@ print(o.read().decode())  # {"success": true}
 
 > ⚠️ The `ros2 service call` CLI **does not work** on this robot (Python 3.8 importlib bug). Always use a Python rclpy script.
 
+### 🚦 Throttle-Reactive LED Control
+
+A ROS2 node `scripts/brake-led.py` dynamically changes the rear LED color based on the current throttle command. It subscribes to the `/webserver_pkg/manual_drive` ROS2 topic (type `deepracer_interfaces_pkg/msg/ServoCtrlMsg`) where the webserver_publisher_node publishes each incoming API drive command.
+
+| Throttle value | Meaning (web API) | LED color | Duration |
+|----------------|--------------------|-----------|----------|
+| `throttle > 0.01` | Moving FORWARD | 🟢 Green | Continuous |
+| `throttle < -0.01` | REVERSING | 🟠 Orange | Continuous |
+| `throttle = 0` (was moving forward) | BRAKING flash | 🔴 Red | 0.5 seconds |
+| `throttle = 0` (idle/stopped) | STOPPED | 🟣 Purple | Continuous |
+
+**⚠️ ROS2 CLI daemon is unreliable.** `ros2 topic info /webserver_pkg/manual_drive` may report `Publisher count: 0` even though DDS is actively publishing to the topic. This is a known ROS2 Foxy bug where the daemon's DDS discovery state gets out of sync. **Do NOT trust `ros2 topic info` to determine if a topic has publishers.** Instead, test with an actual rclpy subscriber — it will receive messages even when the CLI reports 0 publishers. The `scripts/brake-led.py` uses rclpy subscription and works correctly.
+
+**Fire & forget for speed:** The 100Hz LED loop uses `call_async(self.req)` without waiting for the service response. Waiting for responses (even with `spin_until_future_complete(timeout_sec=0.1)`) adds up to 200ms per cycle across two services, dropping the effective frequency below 5Hz — not enough to beat the web server's 1Hz purple override. Unwaited async calls return immediately, keeping the loop at ~100Hz.
+
+**`spin_once(0.05)` for DDS delivery:** The main loop uses `executor.spin_once(timeout_sec=0.05)` to give DDS enough time to deliver the queued service requests. With `timeout_sec=0.001` the requests may never leave the local queue.
+
+**`/servo_pkg/set_led_state` is optional.** This service may not be discovered by the ROS2 daemon right after boot. The current `scripts/brake-led.py` handles this gracefully: it tries both services with individual timeouts and works with just `/ctrl_pkg/set_car_led` if needed. One service is sufficient for full LED control.
+
+**Start on the robot:**
+```bash
+# 1. Start the drive daemon first
+nohup python3 /tmp/drive-daemon.py > /tmp/drive_daemon.log 2>&1 &
+
+# 2. Then start the brake LED node
+source /opt/ros/foxy/setup.bash
+source /opt/aws/deepracer/lib/setup.bash
+nohup python3 /tmp/brake-led.py > /tmp/brake_led.log 2>&1 &
+```
+
+> 💡 Upload scripts via SFTP (paramiko.SFTPClient.put()) to avoid shell escaping issues with heredoc.
+
+### ⚠️ ROS2 Foxy Pitfall: `RuntimeError: dictionary changed size during iteration`
+
+When calling `client.call_async()` in a tight loop (50-100 Hz) from a background thread while `rclpy.spin()` runs in the main thread, ROS2 Foxy's `rclpy/client.py` crashes with:
+
+```
+RuntimeError: dictionary changed size during iteration
+```
+
+**Root cause:** The executor iterates over `_pending_requests` dict in `remove_pending_request()` while the background thread adds new entries via `call_async()`.
+
+**Fix — Manual spin_once() loop with synchronous calls:**
+
+Instead of `rclpy.spin(node)` + background thread with `call_async()`, use a single-threaded loop:
+```python
+executor = SingleThreadedExecutor()
+executor.add_node(node)
+
+while rclpy.ok():
+    executor.spin_once(timeout_sec=0.005)  # Process callbacks
+    node.set_led()                          # Synchronous LED update
+    time.sleep(0.01)                        # ~100 Hz
+```
+
+Then make LED service calls synchronous by wrapping `call_async()` with `rclpy.spin_until_future_complete()`:
+```python
+future = cli.call_async(req)
+rclpy.spin_until_future_complete(node, future, timeout_sec=0.1)
+```
+
+This avoids the dict mutation issue entirely. See `scripts/brake-led.py` for a complete working example.
+
 ### Running ROS2 Commands via SSH
 
 The trick: write a bash script that sources the ROS2 environment FIRST, then runs Python. Each `ssh.exec_command()` is a **fresh shell** — `source` has no effect across calls, so both source and Python must be in the **same** `exec_command()` call.
@@ -426,13 +656,22 @@ There is also a `SetStatusLedSolidSrv` service type for solid-color status LEDs,
 
 ### LED Quick Reference
 
-| Color | red | green | blue |
-|-------|-----|-------|------|
-| 🟣 Purple (default) | 255 | 0 | 255 |
-| 🟢 Green (manual mode) | 0 | 255 | 0 |
-| 🔴 Red | 255 | 0 | 0 |
-| 🔵 Blue | 0 | 0 | 255 |
-| ⚫ Off | 0 | 0 | 0 |
+> **⚠️ LED brightness warning:** The standard RGB range is 0-255, but **255 is very dim on this hardware**. For full brightness, use the PWM-scaled values from the persistent config (`/opt/aws/deepracer/led_values.json`), which go up to **9999825** (`0x9898A9`). Always use `9999825` (or `MAX_PWM`) instead of `255` for visible LEDs:
+> - `255` → barely visible
+> - `9999825` → full brightness
+
+| Color | Standard (0-255) | Full brightness | 
+|-------|:----------------:|:---------------:|
+| 🟣 Purple (default) | 255, 0, 255 | 9999825, 0, 9999825 |
+| 🟢 Green | 0, 255, 0 | 0, 9999825, 0 |
+| 🔴 Red | 255, 0, 0 | 9999825, 0, 0 |
+| 🔵 Blue | 0, 0, 255 | 0, 0, 9999825 |
+| 🟠 Orange | 255, 85, 0 | 9999825, 3333275, 0 |
+| ⚫ Off | 0, 0, 0 | 0, 0, 0 |
+
+```python
+MAX_PWM = 9999825  # Full brightness constant — always use this, not 255
+```
 
 The persistent config lives at `/opt/aws/deepracer/led_values.json` (root-owned, uses PWM-scale values). The runtime state (via API or ROS2) is separate from this file.
 
@@ -481,29 +720,60 @@ The DeepRacer project uses **two separate web dashboards** for different purpose
 | Dashboard | URL | Purpose | Auth |
 |-----------|-----|---------|------|
 | **Hermes Dashboard** | `http://localhost:9999/login` | Hermes Agent web UI (chat, agent config) | admin / steambogadm |
-| **DeepRacer Dashboard** | `http://<robot-ip>:5001/login` | Robot control (drive, camera, calibration) | password: 48AW5fAB |
+| **DeepRacer Dashboard** | `http://<robot-ip>/login` | Robot control (drive, camera, calibration) | password: 48AW5fAB |
 
-The **Hermes dashboard** is the AI agent's web interface — you talk to the agent there. The **DeepRacer dashboard** is the robot's own web UI — you control the car there (drive mode, start/stop, view camera). They are completely separate UI systems, served by different processes on different ports.
+### 🏗️ Dashboard Architecture (nginx + Flask)
 
-When the user says "dashboard" or "el dashboard" in the context of the robot, they almost certainly mean the **DeepRacer dashboard** (port 5001 on the robot), not the Hermes dashboard (port 9999 on the Docker container). If in doubt, clarify: "¿El dashboard de Hermes o el del robot?"
+The DeepRacer dashboard uses a **two-tier architecture** — nginx in front, Flask behind:
 
-> **🕳️ Pitfall**: Assuming "dashboard" means the Hermes dashboard will produce confusion. The user's robot control workflow centers on the DeepRacer web UI at port 5001. The Hermes dashboard is for a different purpose (chatting with the agent).
+```
+Browser ──▶ http://<IP>/  ──▶ nginx (port 80)
+                │                └── redirects to port 443 (HTTPS)
+                ▼
+        https://<IP>/  ──▶ nginx (port 443)
+                │                ├── serves static files (CSS, JS, images) directly from disk
+                │                └── proxies API calls to Flask on port 5001
+                ▼
+        Flask (localhost:5001) ──▶ handles login, API endpoints
+```
+
+**⚠️ CRITICAL: Use port 80 or 443, NOT port 5001.** The login page HTML comes from Flask on port 5001, but the CSS/JS/images are served by **nginx on ports 80/443**. Accessing port 5001 directly loads the HTML with broken styles and 404 errors for every static asset. The correct URL is:
+
+```
+http://10.203.150.56/     (redirects to HTTPS)
+https://10.203.150.56/    (full dashboard, accepts self-signed cert warning)
+```
+
+**Nginx configuration** lives at `/etc/nginx/sites-enabled/default` and shows:
+- Port 80: redirects all traffic to HTTPS
+- Port 443: serves `/static/` from `/opt/aws/deepracer/lib/device_console/`, proxies all other paths to `http://0.0.0.0:5001`
+- Routes `/login`, `/home`, `/api/*` proxied to Flask with auth headers
+- Uses a self-signed SSL certificate (accept the browser warning)
+- Camera routes proxied to `web_video_server` on `127.0.0.1:8080`
+
+> **🕳️ Pitfall — The stock React dashboard (`bundle.js`) often crashes in offline mode.** The 4.5MB React SPA is compiled for AWS cloud-connected use. When it can't reach AWS services it may render a blank white page after flashing the UI briefly. The login page (jQuery) works fine but the main dashboard may not. **Don't waste time debugging the React app** — the drive daemon (`scripts/drive-daemon.py`) is the reliable interactive interface: the agent writes commands via SSH and the daemon maintains the watchdog loop at 30Hz. Pair it with the camera stream at `http://<IP>:8080/stream_viewer?topic=/camera_pkg/display_mjpeg` for visual feedback.
+
+When the user says "dashboard" or "el dashboard" in the context of the robot, they almost certainly mean the **DeepRacer dashboard** (port 80/443 on the robot), not the Hermes dashboard (port 9999 on the Docker container). If in doubt, clarify: "¿El dashboard de Hermes o el del robot?"
+
+> **🕳️ Pitfall**: Assuming "dashboard" means the Hermes dashboard will produce confusion. The user's robot control workflow centers on the DeepRacer web UI. The Hermes dashboard is for a different purpose (chatting with the agent).
 
 ## ROS2 Topics (Read-Only)
 
 7 available topics (all control, no odometry/IMU/battery):
 
-| Topic | Purpose |
-|-------|---------|
-| `/ctrl_pkg/raw_pwm` | Motor PWM state |
-| `/ctrl_pkg/servo_msg` | Steering angle |
-| `/deepracer_navigation_pkg/auto_drive` | Autonomous drive state |
-| `/webserver_pkg/manual_drive` | Incoming manual commands |
-| `/webserver_pkg/calibration_drive` | Calibration |
-| `/parameter_events` | ROS2 standard |
-| `/rosout` | ROS2 standard |
+| Topic | Type | Purpose |
+|-------|------|---------|
+| `/ctrl_pkg/raw_pwm` | unknown | Motor PWM state |
+| `/ctrl_pkg/servo_msg` | unknown | Steering angle |
+| `/deepracer_navigation_pkg/auto_drive` | unknown | Autonomous drive state |
+| `/webserver_pkg/manual_drive` | `deepracer_interfaces_pkg/msg/ServoCtrlMsg` | Incoming manual commands (`float32 angle`, `float32 throttle`) |
+| `/webserver_pkg/calibration_drive` | unknown | Calibration |
+| `/parameter_events` | `rcl_interfaces/msg/ParameterEvent` | ROS2 standard |
+| `/rosout` | `rcl_interfaces/msg/Log` | ROS2 standard |
 
-## DeepRacer Hardware Reference
+**ServoCtrlMsg** fields: `angle` (float32, -1 to +1, negative=left) and `throttle` (float32, -1 to +1). ⚠️ **Convention:** The msg reflects the raw API value — **positive throttle = forward** for the web API. The ROS2 `ctrl_pkg` then applies its internal polarity inversion (`polarity: -1` calibration) when converting to PWM output. See "Movement Control" for details.
+
+The camera does NOT publish a ROS2 topic — uses `web_video_server` on port 8080.
 
 ### Hardware Audit Summary (Verified on This Robot)
 
@@ -544,12 +814,13 @@ This was populated by SSH exploration of the robot and covers:
 
 Before answering ANY question about a DeepRacer project, **read ALL of the project's own documentation files** — do NOT jump to conclusions from memory, quick glances, or previous sessions. The project docs contain the actual IPs, credentials, architecture, and setup steps. Generic advice or memory will have wrong passwords, wrong IPs, or outdated steps.
 
-### The common failure pattern
+### The common failure patterns
 
-1. User asks a question about the robot
-2. Agent answers from memory of a previous session (wrong password, wrong arch, wrong steps)
-3. User corrects: *"mira bien la documentacion"* 
-4. Agent re-reads the docs and finds the correct answer was there all along
+1. **Wrong throttle convention** — This skill documented throttle as "negative=forward" (ROS2 convention), but the **web API uses positive=forward**. Always verify against the project's own `drive_test.py` and `drive_rules.md` before sending movement commands. This is the #1 source of "robot didn't move" bugs.
+
+2. **Dead reckoning from memory** — Answering from memory of a previous session instead of reading the project docs. The correct IPs, passwords, and architecture are in the files, not your head.
+
+3. **Assuming dashboard accessibility** — The dashboard serves on **ports 80/443 (nginx)**, not port 5001 (Flask backend). Port 5001 loads the HTML but all CSS/JS return 404. See "Dashboard Architecture" section for details.
 
 **Break this cycle**: always reach for the project's own docs before opening your mouth. The authentication document for the project is `/workspace/docs/GUIA_SETUP.md`, not a generic DeepRacer manual. The `Documentacion.md` file is a **migration log** (v0.16→v0.18), not an operations guide — but `GUIA_SETUP.md` IS the operations guide. Confusing these two will produce wrong answers.
 
@@ -565,7 +836,7 @@ Before answering ANY question about a DeepRacer project, **read ALL of the proje
 | `.env.example` | Variable names needed for the backend .env | Code uses different names than example |
 | `backend/server.js` | Actual endpoint implementation | — |
 | `backend/vehicleControl.js` | DeepRacer API client code | — |
-| `hermes/memories/MEMORY.md` | Working credentials and connection notes | May have the CORRECT password (scripts use `Steambog1$`, docs say `Steampog1$`) |
+| `hermes/skills/connection_report.md` | **Technical deep-dive** — protocol details, latency measurements, script descriptions, known issues | — |
 
 > ⚠️ **Pitfall**: Guessing or answering from memory before reading these files will produce wrong answers. The documentation is the source of truth, not your recollection of what worked last time. If the user says "mira bien la documentacion" or "antes mira bien", you already missed this step — stop and read.
 
@@ -582,7 +853,14 @@ The same password may appear with different spellings in different files. Cross-
 
 - **Tailscale IPs are NOT reachable** from the Docker container by default. Use the LAN IP instead.
 - The LAN IP **works for ping and SSH** (port 22) from the container.
-- The web API (port 5001) may **time out** from inside Docker — deploy the Node.js backend on the host when this happens.
+- The web API (port 5001) may **time out** from inside Docker due to robot's iptables firewall (policy DROP with no rule for port 5001).
+- **Fix:** SSH into robot and add iptables rules:
+  ```bash
+  # Must use invoke_shell() with paramiko since sudo -S is blocked
+  sudo iptables -I INPUT 1 -s 10.0.0.0/8 -p tcp --dport 5001 -j ACCEPT
+  sudo iptables -I INPUT 2 -s 10.0.0.0/8 -j ACCEPT
+  ```
+  Ports 22 (SSH) and 8080 (camera) are typically allowed through nginx/fail2ban rules; port 5001 needs its own explicit rule.
 - The container reaches the host backend via `host.docker.internal:5002`.
 - The backend (running on host) proxies to the DeepRacer and exposes `POST /api/exec` for SSH commands.
 
@@ -591,6 +869,8 @@ The same password may appear with different spellings in different files. Cross-
 The DeepRacer runs Ubuntu with full USB support. External microcontrollers (ESP32, Arduino, etc.) are detected as serial devices.
 
 **Current setup:** ESP32-D0WD-V3 on `/dev/ttyUSB1` (CP2102) running **MicroPython v1.28.0** with KY-037 sound sensor.
+
+> ⚠️ **ESP32 serial port can change after reboot.** The port may shift from `/dev/ttyUSB1` to `/dev/ttyUSB0` (or vice versa) depending on boot order and other USB devices. Always check with `ls /dev/ttyUSB*` before connecting.
 
 > ⚠️ **Historical note:** The original device was an **ESP8266EX** on CH340 (removed). The ESP32 was identified correctly via `esptool chip_id`.
 
@@ -817,7 +1097,7 @@ In constrained environments (WSL/9p mounts, Docker containers, low-RAM hosts), b
 
 **Recommendation**: Use **MicroPython** for most DeepRacer integration tasks. It's simpler, faster to deploy, and the MicroPython firmware is only ~1.7 MB.
 
-> **🕳️ Pitfall — Don't fight the toolchain**: If `arduino-cli` or `pio run` shows no output after 2 minutes or fails with the same error twice, **stop and switch to MicroPython**. The ESP32 C++ compilation pipeline can take 10+ minutes and multiple rounds of fixes in constrained environments (WSL, Docker, 9p mounts). The user will notice the delay. MicroPython gets you a working sensor integration in ~5 minutes total, including flashing and testing. Reserve C++ compilation for later when the toolchain environment is stable.
+> **🕳️ Time-to-value rule** — If `arduino-cli` or `pio run` shows no output after **2 minutes** of wall-clock time, or fails with the same error twice despite reasonable fix attempts, **stop and switch to MicroPython**. The ESP32 C++ compilation pipeline regularly takes 10+ minutes and multiple rounds of fixes in constrained environments (WSL, Docker, 9p mounts). The user will notice the delay. MicroPython gets you a working sensor integration in ~5 minutes total including flashing and testing. Reserve C++ compilation for a dedicated desktop environment or later when the toolchain is stable. This is a user-expectation decision, not a technical one — watching a progress bar for 10 minutes frustrates the user even if it eventually succeeds.
 
 ### Flashing MicroPython (Recommended)
 
@@ -909,6 +1189,8 @@ This is deliberately simple — a single serial line, text-based, debuggable wit
 
 ### Connecting External Sensors
 
+> **🕳️ Pitfall — Always verify the board model before giving pinout advice**. The same chip (ESP32-D0WD-V3) comes on many different development boards: ESP32 DevKit V1 (30-pin), DevKit V1 (38-pin), NodeMCU-32S, ESP32-DevKitC, etc. Each has different pin labels and positions. Before telling the user where to connect wires, ask what board they have or what labels are silkscreened next to the pins. Guessing the wrong pinout wastes time and confuses the user. The correct reference for the 30-pin DevKit V1 used in this project is `references/esp32-devkit-pinout.md`.
+
 Typical wiring for common modules:
 
 | Sensor | ESP32 Pin | Notes |
@@ -920,7 +1202,11 @@ Typical wiring for common modules:
 | HC-05 GND | GND | |
 | HC-05 TX/RX | Serial2 pins | For dedicated BT passthrough |
 
-> **HC-05 note**: The ESP32 has built-in Bluetooth (Classic + BLE) that's more capable than the HC-05. The HC-05 is only useful if you need a dedicated Bluetooth receiver while the ESP32's radios are busy with Wi-Fi, or as a direct serial-to-BT bridge for the DeepRacer.
+> **⚠️ KY-037 motor noise limitation:** The KY-037 is a simple digital sound threshold sensor. When the robot's motor runs, it generates continuous noise that the KY-037 detects as a `clap` event lasting as long as the motor runs (tested: 17-47 seconds). This means **the motor noise MASKES collision/clap detection during movement**. The sensor cannot distinguish between "motor running noise" and "physical bump" because both exceed the digital threshold. Practical implications:
+> - `clap` events with duration > 1s are probably motor noise, not human claps
+> - `collision` events (short, ~30-200ms) may be detectable ONLY when the motor is off
+> - For collision detection during movement, a mechanical bumper switch or ultrasonic sensor (HC-SR04) is recommended instead
+> - The clap-pattern driving (1 clap=forward, 2 claps=turn, 3 claps=turn) works in IDLE state only (motor off)
 
 For a detailed guide with complete MicroPython code examples, sensor logic, and step-by-step flashing, see `references/esp32-sensor-integration.md`.
 
@@ -942,19 +1228,75 @@ The second column has the format `IP:PORT` where PORT is in hexadecimal. Common 
 
 ## Common Issues
 
+### 🎯 #1 Pitfall: Throttle convention flips between reboots
+
+**This is the single most common cause of "robot doesn't move" in this project.** The DeepRacer web API's throttle convention can change **between reboots** on the same robot:
+
+- On **this robot** (2026-07-10): **negative = forward**, positive = reverse  
+- On other units / earlier sessions: positive = forward, negative = reverse  
+- The project's own `drive_test.py` uses positive=forward (throttle=0.7)
+- The convention can flip **after a reboot** without warning
+
+**🔴 ALWAYS diagnose before driving.** Do NOT assume from memory:
+
+| Interface | Forward | Reverse |
+|-----------|:-------:|:-------:|
+| **ROS2** (`/cmd_vel`, `ctrl_pkg`) | **negative** (polarity=-1) | positive |
+| **Web API** on THIS robot (as of 2026-07-10) | **negative** | positive |
+| **Web API** on some robots | positive | negative |
+| **Project's old `drive_test.py`** | **positive** (throttle=0.7) | negative |
+
+**🔴 ALWAYS diagnose before driving.** The convention can change between sessions. Do NOT assume from memory:
+
+```bash
+# Quick direction test — run on the robot
+echo 'throttle=+0.3' && sleep 1 && echo 'throttle=-0.3'
+# Observe which direction is forward — update your daemon's COMMANDS dict
+```
+
+Update the drive daemon's `COMMANDS` dict accordingly. This is a known quirk on this hardware.
+
+**The `/webserver_pkg/manual_drive` ROS2 topic reflects the raw API value** as sent, before any polarity inversion. So if the API sends `throttle=-0.5` and that moves the robot forward, the topic will show `throttle=-0.5`. The brake LED node subscribes to this topic and uses the raw value.
+
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
+| **Robot doesn't move (API returns 200)** | **Hardware: missing motor power** — LiPo chassis battery not connected OR physical motor enable button not pressed. **Check hardware before debugging software.** | Connect LiPo battery (white 2-pin connector). Press motor enable button on main board. See `references/deepracer-power-diagnostics.md` for the full diagnostic flowchart and I2C bus check. |
+| **Robot doesn't move (hardware OK)** | **Throttle convention inverted** — web API uses positive=forward, but skill historically said negative=forward (ROS2 convention). | Use positive throttle for forward via web API. See #1 Pitfall above. |
 | SSH: Permission denied | Wrong password or SSH keys need regeneration | Use `'Steambog1$'` (single quotes); on robot: `sudo ssh-keygen -A` |
 | SSH: Connection timeout | Wrong IP or network isolation | Verify LAN IP with ping; check Tailscale vs LAN |
 | SSH: Intermittent — connects once then times out | Firewall (iptables policy DROP + fail2ban) after failed auth attempts, OR WiFi power management on robot | Check `sudo iptables -L -n` for `(policy DROP)` on INPUT chain and `f2b-sshd` chain. Fix: `sudo iptables -I INPUT 1 -s 10.0.0.0/8 -j ACCEPT` (verify it's rule #1). If firewall is clean, suspect WiFi: check `iwconfig wlan0` for signal strength, reboot robot as last resort |
-| Web API: Connection timeout | Port 5001 firewalled or HTTPS needed | Try both HTTP and HTTPS; use backend proxy instead |
+| Web API: Connection timeout from Docker | Port 5001 firewalled from Docker container | Use SSH for commands (port 22 works from Docker); camera stream (port 8080) also works from Docker; deploy backend proxy on host as fallback |
 | Backend starts but `/api/start` fails | Backend can't reach DeepRacer web API (port 5001) | Check robot is on, web server is running (`ss -tlnp | grep 5001`), verify `.env` variables match what `server.js` actually reads |
 | `.env` variables don't match code | `.env.example` uses `DEEPRACER_HOST`, but `server.js` reads `HOST` directly | Check actual variable names in `server.js` and `vehicleControl.js`, NOT the `.env.example` |
 | Robot doesn't move | Watchdog expired — no continuous command loop | Send commands every 50-100ms without sleep |
 | CSRF login fails | Token extraction or cookie handling wrong | Check for both `<meta>` and `<input>` token locations; inject Secure cookie manually |
+| ROS2: `ros2 node list` shows incomplete results or hangs | ROS2 daemon in bad state — nodes are actually running but the daemon's DDS discovery is broken | Use `ps aux | grep -E 'python3|ctrl_node|camera_node|webserver'` to see actual running ROS2 processes. `ros2 topic list` can also be unreliable — check port 5001 (web API) and port 8080 (camera) with curl as a faster diagnostic. |
+| ROS2: `RuntimeError: dictionary changed size during iteration` | `call_async()` in tight loop + threaded executor | Use manual `spin_once()` loop with `spin_until_future_complete()` — see \"ROS2 Foxy Pitfall\" section |
 | ESP32: No REPL output / serial silent after flash | DTR/RTS reset on port open | Set `ser.dtr = False` in Python or use `picocom --dtr 0` |
 | ESP32: Serial garbage / wrong chars | Baud rate mismatch | Both sides must use 115200 |
 | ESP32 compile hangs/times out | Toolchain unpacking slow over WSL/9p | Use MicroPython instead |
 | ESP32 not detected after removing old device | Port number changed (`ttyUSB0`→`ttyUSB1`) | Run `ls /dev/ttyUSB*` to find the new port |
+| **I2C bus 1 shows NO devices (`sudo i2cdetect -y 1` returns empty)** | The I2C peripheral bus (motor controller 0x44, battery ADC 0x5E) is hung. Device nodes exist but peripherals don't respond — common after repeated ROS2 launcher restarts, or a loose LiPo battery connection. | **Hardware fix (proven):** Disconnect the LiPo battery (white 2-pin connector), wait a few seconds, reconnect. This power-cycles the I2C bus without a full reboot. Alternative: `sudo reboot`. Verify with `sudo i2cdetect -y 1` — should show `0x08`, `0x44`, `0x5E`. |
+| **ROS2 topic shows `Publisher count: 0` (topic appears dead)** | The ROS2 daemon's DDS discovery is stale — a known ROS2 Foxy bug. The daemon is out of sync with actual DDS participants. Publishers ARE active, but the CLI can't see them. | Verify with an actual rclpy subscriber — it will receive messages. Or check `ps aux | grep webserver_publisher`. If running, trust DDS over the CLI. |
+| ROS2 nodes missing (`webserver_publisher_node`, `camera_node`) | `deepracer_launcher` crashed or didn't fully start | Restart launcher via SSH, verify with `ps aux | grep webserver_publisher` |
+| **Duplicate webserver_publisher_node instances** | Restarting `deepracer_launcher` without killing old processes spawns duplicate ROS2 nodes that conflict on port 5001. Extra instances owned by `deepracer` user (not `root`) are the giveaway. | Kill ALL webserver_publisher_node processes, then restart launcher: `sudo kill $(ps aux | grep webserver_publisher | awk '{print $2}')`, then restart launcher cleanly. |
 
-| ESP32 not detected after removing old device | Port number changed (`ttyUSB0`→`ttyUSB1`) | Run `ls /dev/ttyUSB*` to find the new port |
+### Camera Stream Verification
+
+To verify the camera is working from the Docker container:
+
+```bash
+# Check the ROS web_video_server topic list is reachable
+curl -s -o /dev/null -w '%{http_code}' http://<ROBOT_IP>:8080/
+# Expected: 200
+
+# Capture a single JPEG frame
+curl -s -o /tmp/snapshot.jpg http://<ROBOT_IP>:8080/snapshot?topic=/camera_pkg/display_mjpeg
+python3 -c "import struct; f=open('/tmp/snapshot.jpg','rb'); h=f.read(4); print('JPEG OK' if h[:2]==b'\\xff\\xd8' else 'NOT JPEG')"
+```
+
+Port 8080 (ROS web_video_server) is typically reachable from the Docker container even when port 5001 (web API) is not. The snapshot endpoint returns 160×120 JPEG frames by default. The MJPEG stream is at `http://<IP>:8080/stream_viewer?topic=/camera_pkg/display_mjpeg`.
+
+Two topics available on port 8080:
+- `/camera_pkg/display_mjpeg` — Raw camera MJPEG stream
+- `/sensor_fusion_pkg/overlay_msg` — Camera + LiDAR overlay (if LiDAR connected)
