@@ -22,6 +22,31 @@
 
 ---
 
+## ⚡ Power Architecture — Two Independent Systems
+
+**The #1 hardware cause of "robot doesn't move":** the DeepRacer has two completely separate power paths, and the motors need their own dedicated battery.
+
+| System | Powers | Connector | Monitored? |
+|--------|--------|-----------|:----------:|
+| 💻 **Compute** | Ubuntu, ROS2, WiFi, LED strip, web server | USB-C (power bank or 5V/2A wall charger) | ❌ No (standard USB, no data pins) |
+| ⚡ **Motors** | Drive motor + steering servo | **White 2-pin JST** on main PCB (7.4V LiPo) | ✅ Via I2C (`/i2c_pkg/battery_level`) |
+
+### Key facts
+
+- **The compute system can run on a USB power bank alone.** The purple LED turns on, Wi-Fi connects, the web API responds, the camera streams. But **the motors have zero power** without the LiPo chassis battery.
+- **The AC adapter (12V barrel jack) powers BOTH systems** simultaneously — it runs the compute board AND charges the LiPo battery (if connected).
+- **Physical motor enable button**: A small tactile switch on the main circuit board (near the battery connector) must be pressed after boot. This is a hardware safety interlock — the web API returns `{"success": true}` even when this button is NOT pressed.
+- **Disconnecting AC while the LiPo battery is discharged or absent** causes the robot to shut down immediately.
+
+### Quick diagnostic
+
+If the robot responds to SSH, the camera works, and the web API returns OK for all commands but **nothing physically moves**:
+1. ✅ LiPo battery connected? (white 2-pin plug, not just USB power bank)
+2. ✅ Motor enable button pressed? (small tactile switch on main board)
+3. ✅ Then check software (throttle convention: web API uses positive=forward; watchdog loop at 30Hz)
+
+---
+
 ## Sensors — Verified Reality vs Documentation
 
 | Sensor | Doc Says | Reality | Status |

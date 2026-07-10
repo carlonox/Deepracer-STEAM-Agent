@@ -19,6 +19,46 @@ This is why `{"success": true}` is returned but no visible change — the web se
 
 Beat the web server by sending commands at **50-100 Hz**. Your commands arrive more frequently and "win" on the I2C bus.
 
+### ⚠️ Key Discovery: ROS2 Topic `/webserver_pkg/manual_drive` Has 0 Publishers
+
+The topic appears in `ros2 topic list` and shows **Publisher count: 0** — the `webserver_publisher_node` accepts HTTP PUT commands and drives the motors directly but **never publishes to the ROS2 topic**. Subscribing to this topic with rclpy will never receive messages.
+
+**Workaround:** read the drive daemon's command file `/tmp/drive_cmd` instead. The daemon writes the current command (e.g., "forward", "back", "stop") at 30Hz. A 100Hz polling loop reading this file and calling the LED services directly beats the web server's 1Hz override. See `scripts/brake-led.py`.
+
+### Fire-and-Forget for Speed
+
+Waiting for service responses (`spin_until_future_complete`) adds ~200ms per cycle across two services, dropping effective frequency below 5Hz — not enough to beat the 1Hz override. Use unwaited `call_async()`:
+
+```python
+for cli in (cli1, cli2):
+    if cli.service_is_ready():
+        cli.call_async(req)  # fire & forget, returns instantly
+```
+
+This keeps the loop at ~100Hz. The pending requests are eventually handled by rclpy's executor in `spin_once()`.
+
+### Throttle-Reactive Color Scheme
+
+This robot's web API uses **positive throttle = forward**, **negative = reverse** (confirmed by project's `drive_test.py`). The brake LED node (`scripts/brake-led.py`) implements:
+
+| Condition | Throttle | LED | PWM Value |
+|-----------|----------|:---:|:---------:|
+| Moving forward | > 0.01 | 🟢 Green | 0, MAX, 0 |
+| Braking (was moving forward, now 0) | = 0 with timer | 🔴 Red (0.5s flash) | MAX, 0, 0 |
+| Reversing | < -0.01 | 🟠 Orange | MAX, MAX//2, 0 |
+| Stopped/idle | = 0 | 🟣 Purple (default) | MAX, 0, MAX |
+
+Where `MAX = 9999825` (full PWM brightness from the hardware's `led_values.json`). Using 255 produces a very dim, barely visible glow.
+
+### Brake Timer
+
+A 0.5-second timer prevents the brake flash from being too brief to see:
+
+```python
+self.brake_until = time.time() + 0.5  # show red for 0.5s
+self.was_moving_forward = False       # reset immediately after
+```
+
 ## Rainbow Animation
 
 A rainbow effect uses three sine waves offset by 120° (2.094 radians). Use the max PWM value (~9999825) for full brightness — the default 255 is very dim.
