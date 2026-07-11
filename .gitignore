@@ -7,7 +7,9 @@ hermes/auth.lock
 
 # === DOCKER COMPOSE (tiene API keys) ===
 docker-compose.yml
-
+# === KILO CODE ===
+.kilo
+AgentWorkshop
 # === ESTADO Y BASE DE DATOS ===
 hermes/state.db
 hermes/state.db*
