@@ -1,7 +1,7 @@
 ---
 name: deepracer-control
 description: "Control AWS DeepRacer robots via SSH, web API, and backend proxy — setup, networking, movement commands, camera streaming, LED control, ESP32/KY-037 sound sensor, autonomous exploration with obstacle avoidance, and troubleshooting."
-version: 2.21.0
+version: 2.35.0
 author: Hermes Agent
 platforms: [linux, macos, windows]
 metadata:
@@ -272,11 +272,11 @@ The firmware has a **~200ms watchdog**. If no new command arrives within that wi
 
 | Command | angle | throttle | max_speed |
 |---------|:-----:|:--------:|:---------:|
-| Forward (web API) | 0 | **+0.5 to +0.8** | 1.0 |
-| Fast forward | 0 | **+0.8** | 1.0 |
-| Forward right | 0.5 | **+0.5 to +0.7** | 1.0 |
-| Forward left | -0.5 | **+0.5 to +0.7** | 1.0 |
-| Reverse | 0 | **-0.4** | 0.7 |
+| Forward (this robot, 2026-07-10) | 0 | **-0.3 to -0.5** | 1.0 |
+| Fast forward | 0 | **-0.8** | 1.0 |
+| Forward right | 0.5 | **-0.3 to -0.5** | 1.0 |
+| Forward left | -0.5 | **-0.3 to -0.5** | 1.0 |
+| Reverse (this robot) | 0 | **+0.35 to +0.4** | 0.7 |
 | Brake/Stop | 0 | 0.0 | 0.0 |
 
 > ⚠️ The typical values listed above use the **web API convention** (positive = forward), which is confirmed by the project's own `drive_test.py`. However, **on some robots this convention flips after a reboot** (likely due to motor calibration polarity being re-read differently). If the robot goes backward when you expect forward, **test with both +0.3 and -0.3** to determine the current convention. A quick diagnostic:
@@ -292,9 +292,9 @@ The firmware has a **~200ms watchdog**. If no new command arrives within that wi
 For **interactive real-time control** (rather than pre-scripted sequences), use a drive daemon — a background process on the robot that reads commands from `/tmp/drive_cmd` and maintains the watchdog loop at 30Hz:
 
 ```bash
-echo "forward"  > /tmp/drive_cmd    # Advance straight (throttle +0.5)
-echo "fast"     > /tmp/drive_cmd    # Fast forward (throttle +0.8)
-echo "back"     > /tmp/drive_cmd    # Reverse (throttle -0.4)
+echo "forward"  > /tmp/drive_cmd    # Advance straight (throttle -0.5, neg=forward)
+echo "fast"     > /tmp/drive_cmd    # Fast forward (throttle -0.8)
+echo "back"     > /tmp/drive_cmd    # Reverse (throttle +0.4, pos=reverse)
 echo "left"     > /tmp/drive_cmd    # Turn left (while advancing)
 echo "right"    > /tmp/drive_cmd    # Turn right (while advancing)
 echo "fleft"    > /tmp/drive_cmd    # Forward + sharp left
@@ -318,86 +318,120 @@ nohup python3 /tmp/drive-daemon.py > /tmp/drive_daemon.log 2>&1 &
 
 See `scripts/drive-daemon.py` for the implementation.
 
-### 🤖 Autonomous Explorer (Camera + ESP32 + Stuck Detection)
+### 🛑 SAFETY: Autonomous Throttle Limits (CRITICAL — Read Before Running Explorer)
 
-For full **autonomous exploration** with obstacle avoidance and stuck detection, use `scripts/explorer.py` — a self-contained loop that combines camera and sound sensor for reactive navigation:
+**NEVER use throttle > |0.5| in autonomous mode without direct user supervision.** A throttle of -0.75 caused the robot to crash into a wall at full speed. This was a preventable accident.
+
+| Throttle | Speed | Risk Level | When to Use |
+|----------|-------|:----------:|-------------|
+| -0.25 to -0.35 | Slow crawl | 🟢 Safe | Default for autonomous exploration |
+| -0.40 to -0.50 | Walking pace | 🟡 Caution | Open spaces, user watching camera |
+| -0.55 to -0.75 | Running speed | 🔴 DANGER | Only with direct line-of-sight supervision |
+
+**Hard rule:** If the user is NOT standing next to the robot watching it, the explorer default throttle must be -0.35 or lower. Never modify the explorer's go() throttle to exceed -0.50 unless the user explicitly asks for speed.
+
+### 🤖 Autonomous Explorer (Camera + Optional ESP32)
+
+For **autonomous exploration** with obstacle avoidance, use `scripts/explorer.py`.
+
+**⚠️ CRITICAL: Never run the drive daemon AND the explorer simultaneously.** See "Daemon/Explorer Conflict" in Common Issues.
 
 ```bash
+# Run ONLY the explorer (NO daemon):
 nohup python3 /tmp/explorer.py > /tmp/explorer.log 2>&1 &
+
+# Or run ONLY the daemon (NO explorer) for manual control:
+nohup python3 /tmp/drive-daemon.py > /tmp/drive_daemon.log 2>&1 &
 ```
 
-#### Navigation Algorithm (v4 — Smart Escape)
+#### Navigation Algorithm (v6 — Skip Counter, Long Strokes, No Wiggles)
 
-The current explorer (`scripts/explorer.py`) uses a **deliberative escape** strategy: backup far, look left, look right via camera, choose the clearest path.
+The current explorer (v6) uses a three-state loop with a skip counter to reduce camera checks. Every other forward segment skips the camera check, making movement smoother.
 
-```
+```python
 IDLE:
-  📸 Check ALL THREE zones (left / center / right) via analyze_view()
-  ├── Center obstacle detected → BACKUP state (will look for best exit)
-  ├── Only left blocked → FORWARD with slight right bias (+0.3 angle)
-  ├── Only right blocked → FORWARD with slight left bias (-0.3 angle)
-  └── All clear → FORWARD straight (0.0 angle)
+  if obstacle_ignore_until > now:
+    → GO (skip=1, ignore camera for 8s after escape)
+  elif skip > 0:
+    skip -= 1 → GO (skip camera check this cycle)
+  else:
+    📸 Check camera
+    ├── Obstacle detected → BACKUP
+    └── Clear → GO
 
-FORWARD (0.4s segment):
-  🚗 Drive at throttle=-0.30, current angle bias
-  After 0.4s → stop → IDLE
+GO (10.0s at throttle=-0.35):
+  🚗 Drive continuously for 10 seconds
+  After 10s → stop → IDLE
 
-BACKUP (Smart Escape):
-  ⏪ Reverse at throttle=0.35 for 1.5 seconds
-  👈 Turn left (angle=-0.8, throttle=0) — check camera every ~0.6s
-    ├── If left and center look clear → ESCAPE forward with left bias
-  👉 Turn right (angle=0.8, throttle=0) — check camera every ~0.6s
-    ├── If right and center look clear → ESCAPE forward with right bias
-  🤷 No clear path found → pick the zone with fewest obstacles
-    └── ESCAPE toward best zone
+BACKUP (3.0s total, ONE reverse-turn then escape):
+  0-1.5s:  ⏪ Reverse straight (throttle=+0.40)
+  1.5-3.0s: ↩️ Reverse-turn in RANDOM direction (angle=±0.8, throttle=-0.30)
+  3.0s+:    → set obstacle_ignore_until=now+8.0s, skip=2 → GO
 ```
 
-#### Camera Obstacle Detection (3-Zone Analysis)
+**Key design decisions:**
+- **Skip counter**: After escape, skip=2 means the next TWO forward segments (20s) run without camera checks. This eliminates the "stop-check-go" jerkiness. Default throttle is -0.35 (safe and slow).
+- **10s forward strokes**: Long enough to cover ground. With the skip counter, effective movement is often 20s between camera checks.
+- **No wheel wiggling**: Backup does ONE continuous reverse-turn. No separate "look left"/"look right" phases.
+- **8s forced advance after escape**: Ignore camera for 8s after backup to ensure the robot clears the obstacle area.
+- **Random turn direction**: Picks left or right randomly.
+- **ESP32 optional**: Wrapped in try/except — runs fine without the sensor.
 
-The `analyze_view(img)` function splits the camera into three vertical zones and checks each independently via OpenCV (4.13.0):
+#### Camera Obstacle Detection (Single ROI with Gray Floor Fix)
 
-1. **Color detection (HSV)** — Blue objects: `cv2.inRange(hsv, [80, 20, 20], [145, 255, 255])` with threshold > 15% coverage. Uses a **wide range** with saturation > 20 to avoid gray floor false positives while still detecting the blue suitcase in varied lighting.
-2. **Brightness** — Mean pixel value < 80 + std < 25 → dark obstacle close
-3. **Uniformity** — Low std (< 30) + medium brightness (< 140) → large smooth object (suitcase, wall, box) regardless of color
-4. **Edge density** — Canny edges > 20% of ROI → textured obstacle
-
-Previous versions used a tighter range `[95, 60, 40]-[135, 255, 255]` which missed the blue suitcase in some lighting. The wider range with saturation floor of 20 is the tested sweet spot.
-
-#### Stuck Detection (Frame Comparison)
-
-The `check_stuck()` function compares camera frames **after** each 0.4s forward segment:
+The `analyze_view(img)` function splits the 160x120 camera into three vertical zones and checks each independently via OpenCV (4.13.0):
 
 ```python
-snap = urllib.request.urlopen(CAM_URL, timeout=0.1).read()
-img = cv2.imdecode(np.frombuffer(snap, np.uint8), cv2.IMREAD_GRAYSCALE)
-small = cv2.resize(img, (32, 24))  # 32x24 tiny for speed
-diff = cv2.mean(cv2.absdiff(small, frame_prev))[0]
-if diff < 3:
-    consecutive_collisions += 1
-    state = "backup"
+obs = (m < 60) or (m < 110 and s < 15) or ed > 0.35
 ```
+Where:
+1. **Very dark** (`m < 60`) — close dark obstacle (wall, furniture leg)
+2. **Uniform medium-bright** (`m < 110 and std < 15`) — catches light-colored objects (blue suitcase, box) that aren't dark but uniformly cover the center zone
+3. **High edge density** (`ed > 0.35`) — Canny edges > 35% of ROI = textured obstacle
 
-**Key:** frame_prev is saved at the END of each successful forward cycle (not at the start), avoiding a slow camera fetch that would block the 0.5s movement timer. The `timeout=0.1` ensures the comparison snapshot returns fast enough to not delay the next cycle.
-
-**⚠️ Pitfall: camera timeout blocks the movement loop.** If the camera snapshot takes 2 seconds (default timeout), the 0.4s forward segment expires before any movement executes. Always use `timeout=0.1` for stuck detection snapshots.
-
-**⚠️ Pitfall: state overwrite bug.** If `check_stuck()` sets `state = "backup"`, the calling `else` block in the forward state MUST check `state` before overwriting it back to `"idle"`:
+**Blue detection** uses HSV with **saturation > 50** to avoid the gray floor trap:
 ```python
-check_stuck()
-if state == "backup":
-    continue  # don't overwrite back to idle!
+cv2.inRange(hsv, [80, 50, 30], [145, 255, 255])
+```
+Gray floors have saturation ~0 but arbitrary hue. A range with `S >= 20` (as in v3) falsely detects gray at 29% blue coverage. Requiring `S >= 50` eliminates this entirely.
+
+**Gray floor (HSV saturation) fix — the session's biggest camera breakthrough:**
+
+The original HSV blue range `[80,20,20]-[145,255,255]` with S>=20 caught gray floors at 29% coverage because gray pixels have arbitrary hue in OpenCV's HSV space but low saturation. The floor triggered `bp > 0.15` constantly, making the robot believe there was an obstacle in every direction.
+
+**Fix:** Require saturation > 50:
+```python
+cv2.inRange(hsv, np.array([80, 50, 30]), np.array([145, 255, 255]))
+```
+With this range, gray floors measure `blue=0-2%` instead of `blue=29%`. Only genuine blue objects (the actual blue suitcase) exceed 15% coverage.
+
+**Typical floor values (gray tile/carpet):** blue=0-2%, bright=130-160, std=10-20, edges=4-8%. None trigger the obstacle conditions.
+
+**⚠️ Critical: always test what the camera actually sees before trusting thresholds.** Run this on the robot:
+```python
+import urllib.request, cv2, numpy as np
+r = urllib.request.urlopen("http://localhost:8080/snapshot?topic=/camera_pkg/display_mjpeg", timeout=3)
+img = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
+hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+h,w = img.shape[:2]
+blue = cv2.inRange(hsv, np.array([80,50,30]), np.array([145,255,255]))
+bp = np.count_nonzero(blue) / (h*w)
+roi = gray[h//3:2*h//3, w//3:2*w//3]
+m = np.mean(roi); s = np.std(roi)
+edges = cv2.Canny(roi, 50, 150)
+ed = np.count_nonzero(edges) / (roi.shape[0] * roi.shape[1])
+print(f"blue={bp:.0%} bright={m:.0f} std={s:.0f} edges={ed:.0%}")
 ```
 
-#### Smart Escape: tuning parameters
+#### Stuck Detection (Frame Comparison — deprecated in v4)
 
-| Parameter | v2 (naive) | v4 (smart) | Rationale |
-|-----------|:----------:|:----------:|-----------|
-| Forward throttle | -0.35 | **-0.30** | Slower = safer = more time for camera | 
-| Forward segment | 0.5s | **0.4s** | Shorter = less collision damage |
-| Backup duration | 0.6s | **1.5s** | More reverse distance to fully clear obstacles |
-| Turn-while-backing | 1.2s random | **2.0s looking, camera-guided** | Check left, check right, choose |
-| Camera timeout (analysis) | 1.0s | **1.0s** | OK for idle; for stuck: **0.1s** |
-| Blue HSV range | [95,60,40]-[135,255,255] | **[80,20,20]-[145,255,255]** | Missed suitcase in some lighting |
+V3's frame comparison approach (comparing camera snapshots before/after movement, see v3 code in session reference) was replaced in v4 by the forced-advance grace period. Frame comparison suffered from:
+- **Camera timeout blocking movement**: a 2s camera snapshot timeout blocked the 0.5s forward segment entirely
+- **Gray floor false positives**: the comparison diff was too sensitive to floor texture
+- **No improvement over forced advance**: the 3.5s grace period achieves the same effect more simply
+
+V4's forced-advance is simpler and more robust. Only revert to frame comparison if the robot needs to navigate in spaces where 1.5s of forward movement would collide with something.
 
 #### ESP32 Sound Sensor in Navigation
 
@@ -846,8 +880,10 @@ The same password may appear with different spellings in different files. Cross-
 - Scripts in `hermes/scripts/*.py` — these contain the **working** password (paramiko connect calls)
 - `hermes/memories/MEMORY.md` — working credentials summary
 - `hermes/memories/session_*.md` — detailed session notes
-- `docs/GUIA_SETUP.md` — may have an outdated/typo version
+- `docs/GUIA_SETUP.md` — **may have typos**. SSH password appears as `Steampog1$` (with 'p') in GUIA_SETUP.md but all working scripts use `Steambog1$` (with 'b'). The example IP in GUIA_SETUP.md is `10.203.139.55` while actual scripts use `10.203.150.56`. Trust the scripts, not the setup guide.
 - `.env.example` — variable name template (names may not match what the code actually reads)
+
+> **[1] The `p`→`b` typo in GUIA_SETUP.md is a 30-minute trap.** One character difference stops SSH from working. Always cross-reference at least one working script's credentials against the setup guide before declaring a password invalid.
 
 ## Docker Container Networking Pitfalls
 
@@ -1226,6 +1262,54 @@ The second column has the format `IP:PORT` where PORT is in hexadecimal. Common 
 - 22 → 0x0016 (SSH)
 - 8080 → 0x1F90 (web_video_server)
 
+## 🚀 Post-Reboot Checklist (Do These Every Time)
+
+Every time the DeepRacer is power-cycled, **two things must be done** before remote control works:
+
+### 1. Sync the System Clock
+
+The DeepRacer has **no RTC battery** — when unplugged, the clock resets to January 1, 1970. This breaks Tailscale (mTLS certificates require accurate time) and can cause SSH certificate verification failures.
+
+**From the monitor+keyboard:**
+```bash
+sudo ntpdate -u pool.ntp.org
+```
+
+**Automated (persistent across reboots, add via crontab -e):**
+```cron
+@reboot sleep 30 && sudo ntpdate -u pool.ntp.org 2>/dev/null || true
+```
+
+### 2. Open Firewall for Tailscale Subnet
+
+The robot's iptables has `Chain INPUT (policy DROP)` by default. Tailscale IPs (`100.x.x.x`) are blocked. Port 8080 (camera) usually works because nginx rules allow it, but SSH (22) and API (5001) are blocked.
+
+**From the monitor+keyboard:**
+```bash
+sudo iptables -I INPUT 1 -s 100.0.0.0/8 -j ACCEPT
+```
+
+**Make permanent:**
+```bash
+sudo apt-get install -y iptables-persistent
+sudo iptables-save | sudo tee /etc/iptables/rules.v4 > /dev/null
+```
+
+After this, Tailscale SSH and API access work until the next reboot.
+
+### 3. Verify Everything
+
+```bash
+hostname -I           # Confirm IPs (LAN + Tailscale)
+timedatectl           # Confirm correct date/time
+tailscale status      # Confirm connected
+tailscale ping 100.x.x.x  # Test Tailscale connectivity
+```
+
+### Why This Matters
+
+Before this checklist was documented, each session started with 10-20 minutes of "SSH doesn't work, Tailscale ping works but port 22 is closed" debugging. The root cause was always one of these two issues. Checking both at session start eliminates the most common failure mode entirely.
+
 ## Common Issues
 
 ### 🎯 #1 Pitfall: Throttle convention flips between reboots
@@ -1261,6 +1345,14 @@ Update the drive daemon's `COMMANDS` dict accordingly. This is a known quirk on 
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
 | **Robot doesn't move (API returns 200)** | **Hardware: missing motor power** — LiPo chassis battery not connected OR physical motor enable button not pressed. **Check hardware before debugging software.** | Connect LiPo battery (white 2-pin connector). Press motor enable button on main board. See `references/deepracer-power-diagnostics.md` for the full diagnostic flowchart and I2C bus check. |
+| **Robot completely unreachable (ping, SSH, web API, camera all timeout)** | **Network isolation from Docker container.** The container runs on `172.18.0.0/16` bridge network and has no route to the robot's LAN (`10.203.150.0/24`). Or the robot is off, on a different WiFi, or the IP changed. | **Quick 4-port diagnosis run in parallel:**
+1. `ping -c 2 10.203.150.56` — ICMP reachability
+2. `curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 http://10.203.150.56:5001/login` — Web API
+3. `curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 http://10.203.150.56:8080/` — Camera stream
+4. `ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 deepracer@10.203.150.56 'echo OK'` — SSH
+**If ALL timeout:** check `cat /proc/net/fib_trie` to find our own IP + routing table. If we're on `172.18.0.0/16` with no route to `10.203.x.x`, we're Docker-isolated. Ask user to: (a) turn on robot, (b) verify same WiFi, (c) run backend proxy on host, or (d) add `network_mode: host` to docker-compose.
+**If ping succeeds but SSH/API/camera all timeout:** robot may be on but firewalled (iptables default DROP + fail2ban). User needs to add `-s 10.0.0.0/8 -j ACCEPT` rule.
+**Try Tailscale IP** (`100.117.192.31`) as alternative if LAN IP fails — some networks isolate Docker from LAN but allow Tailscale. |
 | **Robot doesn't move (hardware OK)** | **Throttle convention inverted** — web API uses positive=forward, but skill historically said negative=forward (ROS2 convention). | Use positive throttle for forward via web API. See #1 Pitfall above. |
 | SSH: Permission denied | Wrong password or SSH keys need regeneration | Use `'Steambog1$'` (single quotes); on robot: `sudo ssh-keygen -A` |
 | SSH: Connection timeout | Wrong IP or network isolation | Verify LAN IP with ping; check Tailscale vs LAN |
@@ -1269,7 +1361,7 @@ Update the drive daemon's `COMMANDS` dict accordingly. This is a known quirk on 
 | Backend starts but `/api/start` fails | Backend can't reach DeepRacer web API (port 5001) | Check robot is on, web server is running (`ss -tlnp | grep 5001`), verify `.env` variables match what `server.js` actually reads |
 | `.env` variables don't match code | `.env.example` uses `DEEPRACER_HOST`, but `server.js` reads `HOST` directly | Check actual variable names in `server.js` and `vehicleControl.js`, NOT the `.env.example` |
 | Robot doesn't move | Watchdog expired — no continuous command loop | Send commands every 50-100ms without sleep |
-| CSRF login fails | Token extraction or cookie handling wrong | Check for both `<meta>` and `<input>` token locations; inject Secure cookie manually |
+| CSRF token mismatch (`400 Bad Request — The CSRF tokens do not match`) | The robot's session cookie expired or was extracted from a different login page. This happens when the daemon has been running for a while (cookie TTL expires) OR when running direct `curl` commands without sharing the same session as the daemon. Each `curl` login creates a NEW session cookie — the drive command must use the SAME cookie as the login. | Re-login before drive commands: always capture CSRF token and session cookie from the SAME `curl -D -` response, then use both for subsequent authenticated requests. The drive daemon handles its own session internally — mixing daemon commands with direct curl on different sessions will produce CSRF errors. When debugging, kill the daemon and use a single session for both login and drive. |
 | ROS2: `ros2 node list` shows incomplete results or hangs | ROS2 daemon in bad state — nodes are actually running but the daemon's DDS discovery is broken | Use `ps aux | grep -E 'python3|ctrl_node|camera_node|webserver'` to see actual running ROS2 processes. `ros2 topic list` can also be unreliable — check port 5001 (web API) and port 8080 (camera) with curl as a faster diagnostic. |
 | ROS2: `RuntimeError: dictionary changed size during iteration` | `call_async()` in tight loop + threaded executor | Use manual `spin_once()` loop with `spin_until_future_complete()` — see \"ROS2 Foxy Pitfall\" section |
 | ESP32: No REPL output / serial silent after flash | DTR/RTS reset on port open | Set `ser.dtr = False` in Python or use `picocom --dtr 0` |
@@ -1280,6 +1372,9 @@ Update the drive daemon's `COMMANDS` dict accordingly. This is a known quirk on 
 | **ROS2 topic shows `Publisher count: 0` (topic appears dead)** | The ROS2 daemon's DDS discovery is stale — a known ROS2 Foxy bug. The daemon is out of sync with actual DDS participants. Publishers ARE active, but the CLI can't see them. | Verify with an actual rclpy subscriber — it will receive messages. Or check `ps aux | grep webserver_publisher`. If running, trust DDS over the CLI. |
 | ROS2 nodes missing (`webserver_publisher_node`, `camera_node`) | `deepracer_launcher` crashed or didn't fully start | Restart launcher via SSH, verify with `ps aux | grep webserver_publisher` |
 | **Duplicate webserver_publisher_node instances** | Restarting `deepracer_launcher` without killing old processes spawns duplicate ROS2 nodes that conflict on port 5001. Extra instances owned by `deepracer` user (not `root`) are the giveaway. | Kill ALL webserver_publisher_node processes, then restart launcher: `sudo kill $(ps aux | grep webserver_publisher | awk '{print $2}')`, then restart launcher cleanly. |
+
+| **Drive daemon header says "POSITIVE=forward" but this robot uses negative=forward** | The daemon's source comments at `scripts/drive-daemon.py` line 8 claim `API throttle convention: POSITIVE = forward, NEGATIVE = reverse`. However, this robot was confirmed running negative=forward. The daemon's comment is aspirational, not authoritative — the actual convention depends on motor calibration polarity (`polarity: -1`). | Always test direction before accepting the daemon's header comment. Run `echo "forward" > /tmp/drive_cmd` and observe which direction the robot moves. If backward, swap all throttle signs in the COMMANDS dict. |
+| **Robot convulses / trembles instead of driving smoothly** | **Daemon/Explorer conflict.** Running the drive daemon AND the explorer simultaneously causes them to fight for the API. The daemon defaults to sending "stop" (from an empty `/tmp/drive_cmd`) at 30Hz while the explorer sends "forward" at 20Hz. The motors oscillate between forward and stop, creating a visible tremor or convulsion. | **Never run both at the same time.** Kill any existing processes first: `kill $(ps aux | grep -E 'explorer|drive_daemon' | grep -v grep | awk '{print $2}')`. Then start ONLY the explorer OR only the daemon. If you need the daemon's command file for testing, ensure it reads "forward" before the explorer starts, or just run the explorer alone — it has its own drive loop. |
 
 ### Camera Stream Verification
 

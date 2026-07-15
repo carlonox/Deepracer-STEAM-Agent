@@ -5,7 +5,12 @@ drive-daemon.py — Real-time drive control for DeepRacer.
 Reads commands from /tmp/drive_cmd and continuously sends drive
 commands at 30Hz to beat the 200ms watchdog.
 
-API throttle convention: POSITIVE = forward, NEGATIVE = reverse.
+⚠️ THROTTLE CONVENTION: This skill's daemon uses POSITIVE = forward
+as default, but convention can vary between units and even between
+reboots on the same robot (due to motor calibration polarity).
+The robot tested in 2026-07 sessions uses NEGATIVE = forward.
+ALWAYS test direction before assuming.
+If the robot goes backward on 'forward', swap all signs in COMMANDS.
 
 Usage on robot:
   nohup python3 /tmp/drive-daemon.py > /tmp/drive_daemon.log 2>&1 &
@@ -25,7 +30,9 @@ CMD_FILE = "/tmp/drive_cmd"
 HZ = 30
 
 COMMANDS = {
-    # API web: POSITIVE = forward, NEGATIVE = reverse
+    # ⚠️ Convention varies per robot/reboot. This robot (2026-07-15): negative=forward
+    # If robot goes backward on 'forward', negate ALL throttle signs below.
+    # Quick test: echo 'forward' > /tmp/drive_cmd, observe direction.
     "forward": (0.0,  0.5, 1.0),
     "fast":    (0.0,  0.8, 1.0),
     "back":    (0.0, -0.4, 0.7),
