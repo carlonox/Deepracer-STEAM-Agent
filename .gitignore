@@ -85,3 +85,10 @@ Desktop.ini
 
 # === BACKUP TEMPORAL ===
 backup/
+
+# === PYTHON TEMPORAL ===
+__pycache__
+test
+
+
+realtimesst.log
