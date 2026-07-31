@@ -78,7 +78,7 @@ retiradas del código y la documentación. No contiene valores reales.
   - `ESP32_CAMERA_WIFI_PASSWORD`
 - Ubicaciones locales:
   - `.env` de la raíz.
-  - `esp32_camera_udp/include/secrets.h`, ignorado por Git.
+  - `firmware/esp32-camera-udp/include/secrets.h`, ignorado por Git.
 - Estado: contraseña rotada en ambos archivos locales.
 - Importante: la nueva contraseña no llega al dispositivo hasta recompilar y
   cargar el firmware.
@@ -106,7 +106,7 @@ reduce su exposición documental, pero es disruptiva y requiere coordinación.
 ## Comprobación previa al push
 
 - [ ] `.env` está ignorado por Git.
-- [ ] `esp32_camera_udp/include/secrets.h` está ignorado.
+- [ ] `firmware/esp32-camera-udp/include/secrets.h` está ignorado.
 - [ ] `.env.example` contiene solo `CHANGE_ME` o valores no sensibles.
 - [ ] No hay contraseñas, tokens o claves privadas en el diff.
 - [ ] Las bases de datos, caches, logs y estados de Hermes no están staged.

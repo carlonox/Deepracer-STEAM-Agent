@@ -30,21 +30,31 @@ CMD_FILE = "/tmp/drive_cmd"
 HZ = 30
 
 COMMANDS = {
-    # ⚠️ Convention varies per robot/reboot. This robot (2026-07-15): negative=forward
+    # ⚠️ THROTTLE NORMALIZADO (calibración 2026-07-31): los valores aquí son
+    # [0..1] normalizados; cal() los estira al rango real [0.5, 1] del robot
+    # (zona muerta ~0.5: 0.45 no mueve, 0.50 sí). 0 sigue siendo parada.
+    # ⚠️ Convention varies per robot/reboot. This robot (2026-07): negative=forward
     # If robot goes backward on 'forward', negate ALL throttle signs below.
     # Quick test: echo 'forward' > /tmp/drive_cmd, observe direction.
-    "forward": (0.0,  0.5, 1.0),
-    "fast":    (0.0,  0.8, 1.0),
-    "back":    (0.0, -0.4, 0.7),
-    "left":    (-0.5,  0.5, 1.0),
-    "right":   (0.5,  0.5, 1.0),
-    "fleft":   (-0.7,  0.5, 1.0),
-    "fright":  (0.7,  0.5, 1.0),
-    "bleft":   (-0.5, -0.4, 0.7),
-    "bright":  (0.5, -0.4, 0.7),
+    "forward": (0.0,  0.30, 1.0),   # real ~0.65
+    "fast":    (0.0,  0.70, 1.0),   # real ~0.85
+    "back":    (0.0, -0.20, 0.7),   # real ~-0.60
+    "left":    (-0.5,  0.30, 1.0),
+    "right":   (0.5,  0.30, 1.0),
+    "fleft":   (-0.7,  0.30, 1.0),
+    "fright":  (0.7,  0.30, 1.0),
+    "bleft":   (-0.5, -0.20, 0.7),
+    "bright":  (0.5, -0.20, 0.7),
     "brake":   (0.0,  0.0, 0.0),
     "stop":    (0.0,  0.0, 0.0),
 }
+
+
+def cal(t):
+    """Calibración de zona muerta: (0, 1] normalizado -> [0.5, 1] real (mismo signo)."""
+    if abs(t) < 1e-6:
+        return 0.0
+    return (1.0 if t > 0 else -1.0) * min(1.0, 0.5 + 0.5 * abs(t))
 
 
 def login():
@@ -83,7 +93,7 @@ def api_headers(csrf, cookie):
 def send_drive(session, csrf, cookie, angle, throttle, max_speed):
     try:
         r = session.put(f"{ROBOT_URL}/api/manual_drive",
-                        json={"angle": angle, "throttle": throttle, "max_speed": max_speed},
+                        json={"angle": angle, "throttle": cal(throttle), "max_speed": max_speed},
                         headers=api_headers(csrf, cookie),
                         timeout=1)
         return r.status_code == 200

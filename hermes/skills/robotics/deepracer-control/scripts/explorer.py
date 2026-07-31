@@ -22,8 +22,12 @@ ss.post(f"{U}/login",data={"csrf_token":cs,"password":P},headers={"X-CSRFToken":
 h=lambda:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest","X-CSRFToken":cs,"Cookie":f"session={ck}"}
 ss.put(f"{U}/api/drive_mode",json={"drive_mode":"manual"},headers=h());ss.put(f"{U}/api/start_stop",json={"start_stop":"start"},headers=h())
 print("[EXPLORER] Ready!",flush=True)
+def cal(t):
+ # Zona muerta: normalizado (0,1] -> real [0.5,1]; 0 = parada. Verificado 2026-07-31.
+ if abs(t)<1e-6:return 0.0
+ return (1.0 if t>0 else -1.0)*min(1.0,0.5+0.5*abs(t))
 def go(a,t):
- try:ss.put(f"{U}/api/manual_drive",json={"angle":a,"throttle":t,"max_speed":1.0},headers=h(),timeout=1)
+ try:ss.put(f"{U}/api/manual_drive",json={"angle":a,"throttle":cal(t),"max_speed":1.0},headers=h(),timeout=1)
  except:pass
 def check_cam():
  try:
@@ -49,11 +53,11 @@ try:
    if check_cam():st="backup";tm=n
    else:st="go";tm=n
   elif st=="go":
-   if n-tm<6.0:go(dc,-0.55)
+   if n-tm<6.0:go(dc,-0.10)
    else:go(0,0);print("[STOP]",flush=True);st="idle";tm=n
   elif st=="backup":
-   if n-tm<1.5:go(0,0.40)
-   elif n-tm<3.0:go(random.choice([-0.8,0.8]),-0.30)
+   if n-tm<1.5:go(0,0.10)
+   elif n-tm<3.0:go(random.choice([-0.8,0.8]),-0.05)
    else:ign=n+8.0;dc=random.choice([-0.3,0.3]);print("[ESCAPE]",flush=True);st="go";tm=n
   time.sleep(0.05)
 except KeyboardInterrupt:pass

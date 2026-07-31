@@ -1,0 +1,3 @@
+# Text to Speech
+edge-tts>=6.1
+pydub>=0.25

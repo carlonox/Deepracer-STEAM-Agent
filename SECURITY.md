@@ -6,12 +6,12 @@ Todas las credenciales operativas deben vivir en el archivo `.env` de la raíz.
 Ese archivo está ignorado por Git. La lista pública de variables y valores de
 ejemplo está en `.env.example`.
 
-No se deben crear archivos `.env` adicionales dentro de `backend/`, `frontend/`
+No se deben crear archivos `.env` adicionales dentro de `apps/backend/`, `apps/frontend/`
 o `hermes/`. Backend y Vite leen la configuración de la raíz; Docker Compose la
 carga mediante `env_file`.
 
 El firmware ESP32 es la única excepción técnica: C++ necesita
-`esp32_camera_udp/include/secrets.h` durante la compilación. El archivo está
+`firmware/esp32-camera-udp/include/secrets.h` durante la compilación. El archivo está
 ignorado y su plantilla segura es `secrets.example.h`.
 
 ## Reglas

@@ -80,15 +80,23 @@ hermes/.install_method
 hermes/*.bak*
 
 # === NODE ===
-backend/node_modules/
-backend/.env
-frontend/node_modules/
+**/node_modules/
+frontend/dist/
 
 # === BUILDS Y CACHES ===
 **/__pycache__/
 **/.pio/
 **/dist/
 *.log
+
+# === ENTORNOS PYTHON ===
+.venv/
+venv/
+**/.venv/
+**/venv/
+
+# === ÍNDICE RAG GENERADO ===
+**/faiss_index/
 
 # === ESTADO GENERADO DE HERMES ===
 hermes/skills/.hub/
@@ -102,15 +110,15 @@ hermes/provider_models_cache.json
 hermes/verification_evidence.db
 
 # === SECRETOS DE FIRMWARE ===
-esp32_camera_udp/include/secrets.h
+firmware/esp32-camera-udp/include/secrets.h
 
 # === WINDOWS ===
 Thumbs.db
 Desktop.ini
 *.lnk
 
-# === BACKUP TEMPORAL ===
-backup/
+# === ARCHIVO HISTÓRICO (antes backup/) ===
+archive/hermes-legacy/
 
 # === PYTHON TEMPORAL ===
 __pycache__
@@ -118,3 +126,8 @@ test
 
 
 realtimesst.log
+# Archivos bloqueados por Windows (9p EIO); borrar desde Explorer cuando se pueda
+.stuck/
+
+# Estado runtime de Hermes Desktop (cambia solo, no es fuente)
+hermes/desktop/

@@ -1,30 +1,17 @@
 # Documentación
 
-Documentación técnica, operativa e histórica del proyecto. El índice detallado
-actual está en [`INDICE_DOCUMENTACION.md`](INDICE_DOCUMENTACION.md).
-
-La estructura documental futura, su proceso de migración y las reglas para
-mantenerla están definidos en
-[`../ORGANIZACION_PROYECTO.md`](../ORGANIZACION_PROYECTO.md). Las instrucciones
+Documentación técnica, operativa e histórica del proyecto. La estructura
+documental y sus reglas de mantenimiento están definidas en
+[`../ORGANIZACION_PROYECTO.md`](../ORGANIZACION_PROYECTO.md); las instrucciones
 obligatorias para agentes están en [`../AGENTS.md`](../AGENTS.md).
 
 | Ruta | Propósito |
 |---|---|
-| `GUIA_SETUP.md` | Instalación y operación del DeepRacer. Es la guía operativa principal. |
-| `VISION_NUEVO_PROYECTO.md` | Visión y alcance de la mascota robótica. |
-| `Recopilacion_2026-1_mejorada.md` | Recopilación del trabajo realizado durante el semestre. |
-| `INDICE_DOCUMENTACION.md` | Catálogo detallado de documentos. |
-| `SpeedRacerv.2/` | Proyecto y artefactos históricos; no son la implementación activa. |
+| [`architecture/`](architecture/README.md) | Arquitectura, inventarios y protocolos. |
+| [`operations/`](operations/README.md) | Instalación, operación y handoff. |
+| [`development/`](development/README.md) | Migraciones, decisiones y recopilaciones. |
+| [`plans/`](plans/README.md) | Visión, tareas pendientes y próximas actividades. |
+| [`archive/`](archive/README.md) | Documentos y entornos históricos (SpeedRacerv.2). |
 
-## Clasificación futura
-
-El plan de organización propone dividir esta carpeta en:
-
-- `architecture/`: arquitectura e inventarios técnicos.
-- `operations/`: instalación, operación y handoff.
-- `development/`: migraciones y decisiones técnicas.
-- `plans/`: tareas pendientes y próximas actividades.
-- `archive/`: documentos y entornos históricos.
-
-La migración debe realizarse por fases para actualizar todos los enlaces y no
-confundir documentación histórica con instrucciones vigentes.
+Cada subdirectorio tiene su propio índice. La guía operativa principal es
+[`operations/GUIA_SETUP.md`](operations/GUIA_SETUP.md).
