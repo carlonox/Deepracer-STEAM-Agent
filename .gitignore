@@ -131,3 +131,6 @@ realtimesst.log
 
 # Estado runtime de Hermes Desktop (cambia solo, no es fuente)
 hermes/desktop/
+
+# Canal temporal de diagnóstico con el usuario (se borra tras cada uso)
+diagnostico.txt
