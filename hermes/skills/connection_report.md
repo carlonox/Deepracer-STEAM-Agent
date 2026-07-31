@@ -112,7 +112,7 @@ Ver `hermes/skills/drive_rules.md` para ejemplos funcionales.
 
 ### Backend proxy: server.js + vehicleControl.js
 
-- **Ubicación:** `/workspace/backend/`
+- **Ubicación:** `/workspace/apps/backend/`
 - **Lenguaje:** Node.js (ESM modules)
 - **Puerto:** 5002
 - **Tiempo de inicio:** ~3 segundos (incluye autenticación inicial con el vehículo)

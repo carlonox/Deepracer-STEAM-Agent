@@ -1,0 +1,4 @@
+# Speech to Text
+faster-whisper>=1.0
+sounddevice>=0.4
+numpy>=1.24
