@@ -10,7 +10,7 @@ DeepRacer web API:
 - Script de control: /workspace/hermes/scripts/drive_test.py
 - Skill: deepracer-control (devops/deepracer-control)
 §
-Backend server.js corre en puerto 5002 (PORT env var). Expone endpoints POST /api/start, POST /api/stop, POST /api/manual_drive, GET /api/video_stream. Se autentica contra el DeepRacer (puerto 5001 por defecto) via vehicleControl.js. credenciales en /workspace/backend/.env. No hay SOUL.md ni memories.md en el repo.
+Backend server.js corre en puerto 5002 (PORT env var). Expone endpoints POST /api/start, POST /api/stop, POST /api/manual_drive, GET /api/video_stream. Se autentica contra el DeepRacer (puerto 5001 por defecto) via vehicleControl.js. credenciales en /workspace/apps/backend/.env. No hay SOUL.md ni memories.md en el repo.
 §
 DeepRacer connection report requested by user. Save to hermes/skills/connection_report.md. Covers: SSH connection details, web API (port 5001, HTTPS, CSRF flow, Secure cookie handling), movement endpoints, scripts location, latency observations, and known issues.
 §

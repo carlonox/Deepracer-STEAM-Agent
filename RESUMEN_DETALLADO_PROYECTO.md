@@ -63,23 +63,23 @@ El proyecto convierte un **AWS DeepRacer** (robot con ruedas, cámara, LEDs y RO
 | **`Documentacion.md`** | (863 líneas) Documento de **migración de Hermes v0.16.0 → v0.18.0** "Judgment Release" (2026.7.1): paso a gateway mode con dashboard web nativo y API OpenAI-compatible. Incluye todos los problemas resueltos: dashboard con timeout silencioso, bug de v0.18.0 en `/auth/login`, autenticación en texto plano vs hash, variable `HERMES_DASHBOARD` que no llegaba al container, conflicto del CMD con s6-overlay y working directory incorrecto. |
 | **`HANDOFF.md`** | (312 líneas) Guía de handoff para nueva sesión del agente: tabla de accesos (IPs, SSH, API, dashboards), **problemas de conexión conocidos** (SSH intermitente → persistir; firewall `iptables policy DROP` → `sudo iptables -I INPUT 1 -s 10.0.0.0/8 -j ACCEPT`; container Docker sin Tailscale → usar IP LAN; backend Node en Windows `:5002` como proxy alternativo), especificaciones del robot (Ubuntu 20.04.1, kernel 4.15 deepens, ROS2 Foxy, Python 3.8.5, Intel Atom x86_64, 29GB disco / 15GB libres, ~4GB RAM) y sección "sensores: realidad vs documentación". |
 | **`inventario_deepracer.md`** | Inventario técnico del robot: **sensores** (cámara frontal `/dev/video0/1` MJPEG, LiDAR RPLIDAR 64 sectores ±60° 1m de alcance, I2C con 8 buses — batería/servo/motor/LED —, LED RGB por PWM, servo PWM 1220000–1900000, motor PWM 1311000–1603500 con polaridad −1); **API de control :5001** (flujo obligatorio: login → `drive_mode=manual` → `start_stop=start` → loop `manual_drive` → stop; watchdog 200ms sin pausas; throttle invertido — negativo = avanza — recomendado 0.7; angle −1 izq a +1 der; headers `X-CSRFToken`, `X-Requested-With: XMLHttpRequest`, cookie de sesión); **topics ROS2**: `/ctrl_pkg/raw_pwm` (motor) y `/ctrl_pkg/servo_msg` (dirección). |
-| **`ESP32_CAMERA_UDP.md`** | Protocolo de la **cámara ESP32-S3 por UDP**: dos fuentes de video en `controlcamara.py` (`usb` o `esp32_udp`, actualmente `esp32_udp`); el PC escucha UDP `0.0.0.0:5000`; la ESP crea la red `DeepRacer-Camera`; descubrimiento con el mensaje `DEEPRACER_DISCOVER 5000` hacia UDP `5001`; formato de paquetes: **header big-endian de 14 bytes** = `frame_id:uint32, chunk_index:uint16, chunk_count:uint16, payload_size:uint16, timestamp_ms:uint32` + payload JPEG. |
-| **`PENDIENTE_ESP32_CAMERA.md`** | Estado de la tarea **pausada** de la cámara ESP32: el firmware está escrito pero **no compilado ni cargado**. Hardware detectado: `COM8`, adaptador `USB-Enhanced-SERIAL CH343`, placa asumida **ESP32-S3-WROOM N16R8** con OV3660 (16MB flash, 8MB PSRAM). Cambios ya hechos (fuente `esp32_udp`, receptor UDP, firmware), herramienta PlatformIO instalada (ruta `$env:APPDATA\Python\Python313\Scripts\pio.exe`), pasos para terminar (compilar con `pio run`, cargar con `pio run --target upload` — truco BOOT+RESET —, monitor serie buscando `CAMERA_OK`/`WIFI SSID=DeepRacer-Camera`, conectar a la red Wi-Fi y probar con `py controlcamara.py`), pinout N16R8 CAM y advertencia de no cambiar pines a ciegas. |
+| **`docs/architecture/protocolo-camara-esp32-udp.md`** (antes `ESP32_CAMERA_UDP.md`) | Protocolo de la **cámara ESP32-S3 por UDP**: dos fuentes de video en `controlcamara.py` (`usb` o `esp32_udp`, actualmente `esp32_udp`); el PC escucha UDP `0.0.0.0:5000`; la ESP crea la red `DeepRacer-Camera`; descubrimiento con el mensaje `DEEPRACER_DISCOVER 5000` hacia UDP `5001`; formato de paquetes: **header big-endian de 14 bytes** = `frame_id:uint32, chunk_index:uint16, chunk_count:uint16, payload_size:uint16, timestamp_ms:uint32` + payload JPEG. |
+| **`docs/plans/camara-esp32-pendiente.md`** (antes `PENDIENTE_ESP32_CAMERA.md`) | Estado de la tarea **pausada** de la cámara ESP32: el firmware está escrito pero **no compilado ni cargado**. Hardware detectado: `COM8`, adaptador `USB-Enhanced-SERIAL CH343`, placa asumida **ESP32-S3-WROOM N16R8** con OV3660 (16MB flash, 8MB PSRAM). Cambios ya hechos (fuente `esp32_udp`, receptor UDP, firmware), herramienta PlatformIO instalada (ruta `$env:APPDATA\Python\Python313\Scripts\pio.exe`), pasos para terminar (compilar con `pio run`, cargar con `pio run --target upload` — truco BOOT+RESET —, monitor serie buscando `CAMERA_OK`/`WIFI SSID=DeepRacer-Camera`, conectar a la red Wi-Fi y probar con `py controlcamara.py`), pinout N16R8 CAM y advertencia de no cambiar pines a ciegas. |
 | **`PROXIMA_ACTIVIDAD_ARUCO.md`** | Plan de la próxima actividad: **imprimir y pegar códigos ArUco** en el aula. Recomienda diccionario `DICT_6X6_250`, tamaño > 4×4 cm, IDs de ejemplo (10 = mesa, 20 = impresora, 30 = salida, 40 = zona de carga) y medir el tamaño real de cada código. |
-| **`RESUMEN_FINAL_ARUCO.md`** | Resumen del sistema de navegación ArUco final: `controlcamara.py` como archivo único de control, detección de marcadores, ubicación por el ArUco más cercano, definición de lugares con `ARUCO_PLACES` (por ejemplo `10: mesa`, `20: impresora`, `30: salida`). |
+| **`docs/architecture/navegacion-aruco.md`** (antes `RESUMEN_FINAL_ARUCO.md`) | Resumen del sistema de navegación ArUco final: `controlcamara.py` como archivo único de control, detección de marcadores, ubicación por el ArUco más cercano, definición de lugares con `ARUCO_PLACES` (por ejemplo `10: mesa`, `20: impresora`, `30: salida`). |
 
 ### Código principal
 
 | Archivo | Detalle |
 |---|---|
-| **`controlcamara.py`** | (1013 líneas) **Navegador ArUco + control del vehículo**, el cerebro de movimiento. Secciones: |
+| **`apps/navigation/src/controlcamara.py`** (lanzador compatible en raíz) | (1013 líneas) **Navegador ArUco + control del vehículo**, el cerebro de movimiento. Secciones: |
 | | • **Config red/backend**: `BACKEND_URL = http://127.0.0.1:5002`, canal TCP de manejo `127.0.0.1:5003`, `ENABLE_VEHICLE_CONTROL = True`. |
 | | • **Config cámara**: `CAMERA_SOURCE = "esp32_udp"` (o `"usb"`), tamaño 640×480, UDP `0.0.0.0:5000`, ESP en `192.168.4.1`. |
 | | • **Config ArUco**: diccionario `DICT_ARUCO_ORIGINAL` + 6 diccionarios de diagnóstico, `MARKER_SIZE = 0.125` m (12.5 cm), distancia objetivo al waypoint 0.50 m con deadzone 0.08, throttles 0.60–0.70, `KP_STEER = 1.3`, límite de velocidad 0.70, safety frontal 35 cm, timeout de 2 frames si pierde el objetivo. |
 | | • **Mapa/rutas**: `ARUCO_PLACES = {50: mesa, 100: impresora, 150: salida}` y grafo `ARUCO_ROUTES` (`mesa → impresora → salida`); palabras de parada (`para`, `detente`, `stop`…) y de movimiento (`ve`, `anda`, `llévame`…). |
 | | • **Clases**: `DeepRacerAPIClient` (cliente del backend), `AsyncDriveSender` (envío asíncrono de comandos), `SafetyGate` (parada de seguridad), `LatestFrameCamera` (cámara USB) y `ESP32UdpJpegCamera` (receptor UDP con reassembly de JPEG). |
 | | • **Funciones**: detección de marcadores, `estimate_pose_marker` (estimación de pose), `choose_marker`, `arrived_at_marker`, `drive_command_for_marker` (control proporcional al error), `shortest_place_route` (BFS por el grafo), consola de texto con intérprete de instrucciones ("ve a salida"), y `main()` con el bucle de navegación. |
-| **`requirements-controlcamara.txt`** | Dependencias de `controlcamara.py` (62 bytes; verificar contenido — probablemente `opencv-contrib-python`, `numpy`, `requests`). |
+| **`apps/navigation/requirements.txt`** (antes `requirements-controlcamara.txt`) | Dependencias de `controlcamara.py` (62 bytes; verificar contenido — probablemente `opencv-contrib-python`, `numpy`, `requests`). |
 | **`get_ip.py`** | Archivo de 2 bytes, prácticamente vacío (placeholder). |
 
 ### Infraestructura Docker
@@ -105,7 +105,7 @@ El proyecto convierte un **AWS DeepRacer** (robot con ruedas, cámara, LEDs y RO
 
 ---
 
-## 🔧 `backend/` — Proxy Node.js + Express (puerto 5002)
+## 🔧 `apps/backend/` — Proxy Node.js + Express (puerto 5002)
 
 Backend que **intermedia entre cualquier cliente y la API web del DeepRacer**. Maneja la autenticación (login + CSRF + cookies), el proxy de video y un canal TCP rápido para manejo continuo.
 
@@ -126,7 +126,7 @@ Backend que **intermedia entre cualquier cliente y la API web del DeepRacer**. M
 
 ---
 
-## 🖥️ `frontend/` — Interfaz web React + Vite
+## 🖥️ `apps/frontend/` — Interfaz web React + Vite
 
 Interfaz heredada del proyecto 2025 (conservada como base de comunicación con el hardware). React 18 + Vite 7 + Tailwind 3 + daisyUI 4 + lucide-react.
 
@@ -150,7 +150,7 @@ Interfaz heredada del proyecto 2025 (conservada como base de comunicación con e
 
 ---
 
-## 📚 `RAG/` — Sistema RAG del aula STEAM
+## 📚 `apps/rag/` — Sistema RAG del aula STEAM
 
 Base de conocimiento para que la mascota responda preguntas sobre los equipos del aula. **20 manuales en Markdown**:
 
@@ -187,7 +187,7 @@ Base de conocimiento para que la mascota responda preguntas sobre los equipos de
 
 ---
 
-## 🎙️ `SpeechToText/` — Reconocimiento de voz en tiempo real
+## 🎙️ `apps/speech-to-text/` — Reconocimiento de voz en tiempo real
 
 | Archivo | Detalle |
 |---|---|
@@ -200,7 +200,7 @@ Base de conocimiento para que la mascota responda preguntas sobre los equipos de
 
 ---
 
-## 🔊 `TextToSpeech/` — Síntesis de voz
+## 🔊 `apps/text-to-speech/` — Síntesis de voz
 
 | Archivo | Detalle |
 |---|---|
@@ -208,7 +208,7 @@ Base de conocimiento para que la mascota responda preguntas sobre los equipos de
 
 ---
 
-## 📷 `esp32_camera_udp/` — Firmware ESP32-S3 (cámara por UDP)
+## 📷 `firmware/esp32-camera-udp/` — Firmware ESP32-S3 (cámara por UDP)
 
 Proyecto **PlatformIO** para convertir una ESP32-S3 con cámara OV3660 en una cámara inalámbrica para el robot (porque la cámara USB del DeepRacer tiene limitaciones).
 
@@ -244,11 +244,11 @@ Proyecto **PlatformIO** para convertir una ESP32-S3 con cámara OV3660 en una c�
 
 | Archivo | Detalle |
 |---|---|
-| **`yolov5n.onnx`** | Modelo **YOLOv5 nano** en formato ONNX (3.9 MB) — detección de objetos (probablemente para detectar personas/obstáculos con la cámara). |
+| **`models/vision/yolov5n.onnx`** | Modelo **YOLOv5 nano** en formato ONNX (3.9 MB) — detección de objetos (probablemente para detectar personas/obstáculos con la cámara). |
 
 ---
 
-## 💾 `backup/` — Respaldos de sesiones anteriores
+## 🗄️ `archive/hermes-legacy/` (antes `backup/`) — Respaldos de sesiones anteriores
 
 | Archivo | Detalle |
 |---|---|
@@ -263,7 +263,7 @@ Proyecto **PlatformIO** para convertir una ESP32-S3 con cámara OV3660 en una c�
 
 ---
 
-## 🔧 `bin/` — Herramientas
+## 🔧 `tools/` (antes `bin/`) — Herramientas
 
 | Archivo | Detalle |
 |---|---|
@@ -329,7 +329,7 @@ Carpeta montada como `/opt/data` dentro del container. Contiene todo el estado d
 ## ⚠️ Notas y advertencias para futuras sesiones
 
 1. **Las contraseñas reales** (SSH, API web, dashboard) están en `HANDOFF.md`, `backup/`, `session_2026-06-17.md` y `.env` — este documento no las replica a propósito.
-2. **Tarea pausada**: el firmware de `esp32_camera_udp` sigue sin compilarse/cargarse en la ESP32 (ver `PENDIENTE_ESP32_CAMERA.md`).
+2. **Tarea pausada**: el firmware de `firmware/esp32-camera-udp` sigue sin compilarse/cargarse en la ESP32 (ver `docs/plans/camara-esp32-pendiente.md`).
 3. **Regla de oro del manejo**: siempre `POST /api/start` antes de mover y **nunca** `sleep` entre comandos (watchdog de 200ms del robot).
 4. **SSH intermitente**: persistir en los reintentos; firewall del robot con `iptables policy DROP` (abrir con `-s 10.0.0.0/8 -j ACCEPT`).
 5. **El container Docker no tiene Tailscale**: usar la IP LAN `10.203.150.56`.

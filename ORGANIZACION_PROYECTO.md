@@ -1,6 +1,8 @@
 # Plan maestro de organización y migración segura
 
-> Estado: plan ejecutable, todavía sin aplicar los movimientos estructurales.
+> Estado: fases 0-10 ejecutadas el 2026-07-31. Pendientes de host:
+> validación Docker Compose (daemon no disponible en la sesión de migración),
+> validación PowerShell en Windows y borrado de una carpeta vacía residual (`backend/`).
 >
 > Audiencia: personas y agentes de IA que mantengan este repositorio.
 >
@@ -714,7 +716,8 @@ Toda modificación futura a esta arquitectura debe añadir una entrada breve:
 
 | Fecha | Decisión | Motivo | Rutas afectadas | Compatibilidad |
 |---|---|---|---|---|
-| 2026-07-31 | Adoptar organización por componentes y migración por fases. | Separar fuente, estado, documentación e históricos. | Todo el repositorio. | Plan aún no ejecutado. |
+| 2026-07-31 | Adoptar organización por componentes y migración por fases. | Separar fuente, estado, documentación e históricos. | Todo el repositorio. | Ejecutado (fases 0-10); validaciones Docker/PS pendientes en el host. |
+| 2026-07-31 | Cambio funcional: calibración de zona muerta del throttle (THROTTLE_DEAD_ZONE=0.5) en el backend; consumidores envían valores normalizados [-1,1]. | El robot no mueve motores con |throttle| < 0.5 (verificado en vivo); se estira (0,1] a [0.5,1] preservando 0=parada y el signo. | apps/backend/vehicleControl.js, controlcamara.py, scripts del skill (daemon/explorer), .env(.example), GUIA_SETUP, HANDOFF, API.md. | Cambio deliberado e independiente de la migración; autorizado por el usuario; pendiente verificación física con backend reiniciado. |
 
 Si una decisión cambia la estructura objetivo, debe actualizar en el mismo
 cambio el árbol canónico, mapa de migración, reglas de mantenimiento y README
@@ -724,17 +727,17 @@ raíz. No se añaden excepciones silenciosas.
 
 | Fase | Estado | Evidencia | Pendientes |
 |---|---|---|---|
-| 0 — Preflight | Pendiente | — | Inventario rastreado/generado y baseline segura. |
-| 1 — Gobernanza | En progreso | Índices iniciales y este plan. | Completar plantilla en cada componente. |
-| 2 — Documentación | Pendiente | — | Crear subdirectorios y sanear secretos. |
-| 3 — Firmware/herramientas | Pendiente | — | — |
-| 4 — Voz | Pendiente | — | Manifiestos reproducibles. |
-| 5 — RAG | Pendiente | — | Separar fuente e índice generado. |
-| 6 — Frontend | Pendiente | — | — |
-| 7 — Backend | Pendiente | — | Healthcheck seguro. |
-| 8 — Navegación | Pendiente | — | Modo de simulación y fixtures. |
-| 9 — Integración | Pendiente | — | Arranque sin activar vehículo. |
-| 10 — Archivo/limpieza | Pendiente | — | — |
+| 0 — Preflight | ✅ Completada | Inventario y baseline documentados; `.gitignore` corregido (node_modules, venv, faiss_index, archive); fuera de tracking: `RAG/__pycache__/*.pyc` y `SpeechToText/realtimesst.log`; `py_compile`, `node --check` y YAML de compose válidos. | `docker compose config` real pendiente (plugin no disponible en la sesión). |
+| 1 — Gobernanza | ✅ Completada | READMEs por componente existentes; plantilla creada en `docs/development/plantilla-README-componente.md`; reglas en `AGENTS.md`. | — |
+| 2 — Documentación | ✅ Completada | `docs/{architecture,operations,development,plans,archive}` con índices; 11 documentos movidos (GUIA_SETUP, HANDOFF, migración v0.18, protocolo ESP32, planes, inventario, SpeedRacerv.2 completo); 0 enlaces locales rotos. | — |
+| 3 — Firmware/herramientas | ✅ Completada | `firmware/esp32-camera-udp/` con `platformio.ini` intacto; `tools/arduino/arduino-cli` v1.5.1 con SHA-256 documentado. | Compilación PlatformIO no ejecutada (toolchain no disponible); upload requiere autorización. |
+| 4 — Voz | ✅ Completada | `apps/speech-to-text/` y `apps/text-to-speech/` con `src/`, `tests/`, `requirements.txt`; 3 tests de humo pasando. | Prueba con micrófono/altavoz real opcional. |
+| 5 — RAG | ✅ Completada | `apps/rag/{src,knowledge,tests}`; rutas resueltas desde `Path(__file__)`; índice generado en `faiss_index/` ignorado; 2 tests pasando (mismo conjunto de 20 fuentes). | Reindexar con langchain en el entorno destino. |
+| 6 — Frontend | ✅ Completada | `apps/frontend/`; `envDir` y rutas `.env` corregidas; `move.js` movido a `scripts/` con advertencia de hardware; `npm ci` + `vite build` OK. | Lint: 18 errores preexistentes en archivos modificados por el usuario (no tocados). |
+| 7 — Backend | ✅ Completada | `apps/backend/`; healthcheck seguro `GET /api/health` probado antes y después del movimiento; `npm ci` OK; `node --check` OK; **validado en el host Windows 2026-07-31** (`BACKEND_PID=19276`, `HEALTH_OK`). | — |
+| 8 — Navegación | ✅ Completada | `apps/navigation/src/controlcamara.py` + lanzador compatible en raíz; `models/vision/yolov5n.onnx`; 18 tests sin hardware pasando (BFS, UDP, SafetyGate). | Pruebas físicas solo con autorización explícita. |
+| 9 — Integración | ✅ Completada | `scripts/{start,stop,diagnostics,maintenance}`; arranque sin activar vehículo (healthcheck); stop solo mata el PID del proyecto; lanzadores de raíz delegan; `start-backend-only.ps1` validado en el host (healthcheck OK); README raíz y `apps/README.md` actualizados; montajes intactos. | `docker compose build hermes` y `start-services.ps1` completos pendientes de ejecutar en el host (opcional). |
+| 10 — Archivo/limpieza | ✅ Completada | `archive/hermes-legacy/` (antes `backup/`, ignorado por Git); `archive/README.md`; skills de Hermes actualizadas; barrido global sin referencias operativas a rutas antiguas; **carpetas residuales `backend/` y `.stuck/` eliminadas desde Windows 2026-07-31**. | — |
 
 ## 16. Definición de terminado
 

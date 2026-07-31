@@ -60,18 +60,14 @@ estructura objetivo y el plan de migración seguro.
 
 | Ruta | Contenido |
 |---|---|
-| [`backend/`](backend/README.md) | Proxy Express y control de la API del vehículo. |
-| [`frontend/`](frontend/README.md) | Interfaz React para teclado, gamepad y VR. |
-| [`RAG/`](RAG/README.md) | Buscador y manuales del aula STEAM. |
+| [`apps/`](apps/README.md) | Aplicaciones: backend, frontend, navegación, RAG, voz. |
+| [`firmware/`](firmware/README.md) | Firmware de microcontroladores (ESP32-S3). |
 | [`hermes/`](hermes/README.md) | Extensiones y volumen persistente de Hermes. |
-| [`esp32_camera_udp/`](esp32_camera_udp/README.md) | Firmware de la cámara ESP32-S3. |
-| [`SpeechToText/`](SpeechToText/README.md) | Servicio de reconocimiento de voz. |
-| [`TextToSpeech/`](TextToSpeech/README.md) | Servicio de síntesis de voz. |
 | [`models/`](models/README.md) | Modelos binarios de visión. |
+| [`tools/`](tools/README.md) | Herramientas binarias locales. |
 | [`docs/`](docs/README.md) | Documentación activa e histórica. |
-| [`backup/`](backup/README.md) | Copias antiguas, no activas. |
-| [`bin/`](bin/README.md) | Herramientas binarias locales. |
+| [`scripts/`](scripts/README.md) | Arranque, parada, diagnóstico y mantenimiento. |
 
-Los puntos de entrada que todavía viven en la raíz son `controlcamara.py`,
-`start-deepracer.ps1` y `stop-deepracer.ps1`. Se conservan allí durante la
-primera fase para no romper rutas operativas.
+Puntos de entrada en la raíz: `start-deepracer.ps1` y `stop-deepracer.ps1`
+(delegan en `scripts/`). El lanzador compatible `controlcamara.py` delega en
+`apps/navigation/src/controlcamara.py`.
