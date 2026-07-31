@@ -18,7 +18,7 @@
 | **Arch** | x86_64 (Intel Atom) |
 | **Storage** | 29GB total, 15GB free |
 | **RAM** | ~4GB (2GB used at idle) |
-| **Sudo password** | Same as SSH: `Steambog1$` |
+| **Sudo password** | Same as SSH: `${DEEPRACER_SSH_PASSWORD}` |
 
 ---
 
@@ -226,9 +226,9 @@ while True:
 
 | Service | Credential |
 |---------|-----------|
-| **SSH** | `deepracer` / `Steambog1$` |
-| **Web API** | Password: `48AW5fAB` |
-| **Hermes Dashboard** | `admin` / `steambogadm` on `localhost:9999` |
+| **SSH** | `deepracer` / `${DEEPRACER_SSH_PASSWORD}` |
+| **Web API** | Password: `${DEEPRACER_API_PASSWORD}` |
+| **Hermes Dashboard** | `admin` / `${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD}` on `localhost:9999` |
 | **DeepRacer Dashboard** | `http://10.203.150.56:5001/login` |
 | **Camera Stream** | `http://10.203.150.56:8080/stream_viewer?topic=/camera_pkg/display_mjpeg` |
 | **Camera Snapshot** | `http://10.203.150.56:8080/snapshot?topic=/camera_pkg/display_mjpeg` |

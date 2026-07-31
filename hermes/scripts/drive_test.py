@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """drive_test.py - Secuencia de movimientos variados del DeepRacer."""
 import paramiko
+import os, shlex
+
+api_password = shlex.quote(os.environ["DEEPRACER_API_PASSWORD"])
 import time
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('10.203.150.56', username='deepracer', password='Steambog1$', timeout=10)
+ssh.connect(__import__("os").environ["DEEPRACER_HOST"], username=__import__("os").environ["DEEPRACER_SSH_USER"], password=__import__("os").environ["DEEPRACER_SSH_PASSWORD"], timeout=10)
 print("SSH OK")
 
 sftp = ssh.open_sftp()
 with sftp.open('/tmp/drive_test.sh', 'w') as f:
-    f.write("""#!/bin/bash
+    f.write(("""#!/bin/bash
 
 # === LOGIN ===
 echo "=== LOGIN ==="
@@ -22,7 +25,7 @@ echo "localhost\tFALSE\t/\tFALSE\t0\tsession\t${SESSION_COOKIE#session=}" > /tmp
 curl -s -b /tmp/cookies.txt -c /tmp/cookies.txt \\
   -X POST http://localhost:5001/login \\
   -H "X-CSRFToken: $CSRF" \\
-  -d "password=48AW5fAB"
+  -d "password=${DEEPRACER_API_PASSWORD}"
 echo ""
 
 # === MODO MANUAL + START ===
@@ -101,7 +104,7 @@ curl -s -b /tmp/cookies.txt -c /tmp/cookies.txt -X PUT http://localhost:5001/api
 echo ""
 
 echo "=== DONE ==="
-""")
+""").replace("${DEEPRACER_API_PASSWORD}", api_password))
 sftp.close()
 print("Script subido")
 

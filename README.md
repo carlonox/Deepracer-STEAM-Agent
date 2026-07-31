@@ -2,6 +2,22 @@
 
 Mascota AI basada en AWS DeepRacer controlada por Hermes Agent.
 
+## Cómo orientarse
+
+- [Plan maestro de organización](ORGANIZACION_PROYECTO.md): estructura
+  canónica, migración segura, verificaciones y mantenimiento futuro.
+- [Instrucciones para agentes](AGENTS.md): reglas obligatorias al añadir,
+  mover o retirar contenido.
+- [Política de seguridad](SECURITY.md): almacenamiento, rotación y publicación
+  segura de credenciales.
+- [Lista de rotación](CREDENTIAL_ROTATION.md): credenciales que deben renovarse
+  y cómo verificar cada cambio sin activar el vehículo.
+- [Índice de documentación](docs/README.md): guías activas e historia.
+
+Antes de reorganizar rutas, lee el plan completo. Los movimientos se ejecutan
+por componentes y con validaciones intermedias; iniciar el software no debe
+usarse como prueba automática porque algunos flujos pueden activar el vehículo.
+
 ## Requisitos
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
@@ -39,16 +55,23 @@ Mascota AI basada en AWS DeepRacer controlada por Hermes Agent.
 
 ## Estructura
 
-```
-├── docker-compose.yml      # Contenedor Docker
-├── Dockerfile.hermes        # Imagen con paramiko
-├── backend/                 # Express.js (proxy API)
-├── frontend/                # React + Vite (interfaz web)
-├── RAG/                     # Sistema RAG (20 manuales)
-├── hermes/                  # Hermes Agent
-│   ├── soul/                # Personalidad del robot
-│   ├── scripts/             # Scripts de control
-│   ├── skills/              # Habilidades aprendidas
-│   └── memories/            # Contexto acumulado
-└── docs/                    # Documentación
-```
+Consulta [ORGANIZACION_PROYECTO.md](ORGANIZACION_PROYECTO.md) para ver la
+estructura objetivo y el plan de migración seguro.
+
+| Ruta | Contenido |
+|---|---|
+| [`backend/`](backend/README.md) | Proxy Express y control de la API del vehículo. |
+| [`frontend/`](frontend/README.md) | Interfaz React para teclado, gamepad y VR. |
+| [`RAG/`](RAG/README.md) | Buscador y manuales del aula STEAM. |
+| [`hermes/`](hermes/README.md) | Extensiones y volumen persistente de Hermes. |
+| [`esp32_camera_udp/`](esp32_camera_udp/README.md) | Firmware de la cámara ESP32-S3. |
+| [`SpeechToText/`](SpeechToText/README.md) | Servicio de reconocimiento de voz. |
+| [`TextToSpeech/`](TextToSpeech/README.md) | Servicio de síntesis de voz. |
+| [`models/`](models/README.md) | Modelos binarios de visión. |
+| [`docs/`](docs/README.md) | Documentación activa e histórica. |
+| [`backup/`](backup/README.md) | Copias antiguas, no activas. |
+| [`bin/`](bin/README.md) | Herramientas binarias locales. |
+
+Los puntos de entrada que todavía viven en la raíz son `controlcamara.py`,
+`start-deepracer.ps1` y `stop-deepracer.ps1`. Se conservan allí durante la
+primera fase para no romper rutas operativas.

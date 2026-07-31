@@ -121,7 +121,7 @@ def consultar_ollama(messages: list[dict], model: str, base_url: str) -> str:
     
     client = OpenAI(
         base_url=base_url,
-        api_key="ollama"
+        api_key=os.getenv("RAG_API_KEY", "ollama-local")
     )
     
     extra_kwargs = {}

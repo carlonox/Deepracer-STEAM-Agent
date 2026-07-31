@@ -4,15 +4,18 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import path from "path";
+import net from "net";
 import { fileURLToPath } from "url";
 import { startVehicle, stopVehicle, manualDrive, initSession, getVideoStream } from "./vehicleControl.js";
 import { Client as SSHClient } from "ssh2";
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 
-const PORT = process.env.PORT || 5002; 
+const PORT = process.env.BACKEND_PORT || 5002;
+const DRIVE_TCP_PORT = Number(process.env.DRIVE_TCP_PORT || 5003);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 
 app.disable("etag");
@@ -115,10 +118,10 @@ app.post("/api/exec", async (req, res) => {
   });
 
   ssh.connect({
-    host: process.env.HOST,
-    port: parseInt(process.env.SSH_PORT) || 22,
-    username: process.env.SSH_USER,
-    password: process.env.SSH_PASS,
+    host: process.env.DEEPRACER_HOST,
+    port: parseInt(process.env.DEEPRACER_SSH_PORT) || 22,
+    username: process.env.DEEPRACER_SSH_USER,
+    password: process.env.DEEPRACER_SSH_PASSWORD,
     readyTimeout: 10000,
   });
 });
@@ -157,3 +160,62 @@ app.get("/api/video_stream", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () =>
   console.log(`Backend activo en http://0.0.0.0:${PORT}`)
 );
+
+async function handleDriveTcpCommand(command) {
+  if (command.init) {
+    await startVehicle();
+    return { ok: true, message: "manual_ready" };
+  }
+
+  if (command.stop) {
+    await stopVehicle();
+    return { ok: true, message: "stopped" };
+  }
+
+  const { angle, throttle, max_speed } = command;
+  if (angle === undefined || throttle === undefined || max_speed === undefined) {
+    return { ok: false, error: "missing angle, throttle or max_speed" };
+  }
+
+  await manualDrive(angle, throttle, max_speed);
+  return { ok: true, message: "drive_sent" };
+}
+
+const driveTcpServer = net.createServer((socket) => {
+  socket.setNoDelay(true);
+  socket.setKeepAlive(true);
+  let buffer = "";
+  let chain = Promise.resolve();
+
+  socket.on("data", (chunk) => {
+    buffer += chunk.toString("utf8");
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      chain = chain.then(async () => {
+        try {
+          const command = JSON.parse(trimmed);
+          const result = await handleDriveTcpCommand(command);
+          socket.write(`${JSON.stringify(result)}\n`);
+        } catch (err) {
+          socket.write(`${JSON.stringify({ ok: false, error: err.message })}\n`);
+        }
+      });
+    }
+  });
+
+  socket.on("error", (err) => {
+    console.warn(`Cliente TCP de manejo desconectado con error: ${err.message}`);
+  });
+});
+
+driveTcpServer.listen(DRIVE_TCP_PORT, "127.0.0.1", () => {
+  console.log(`Canal TCP de manejo activo en 127.0.0.1:${DRIVE_TCP_PORT}`);
+});
+
+driveTcpServer.on("error", (err) => {
+  console.error(`Error en canal TCP de manejo: ${err.message}`);
+});

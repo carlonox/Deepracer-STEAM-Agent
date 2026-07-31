@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """explorer.py v5 — Simplified, long strokes, no wiggles, detailed camera logs"""
 import serial,requests,re,time,threading,urllib.request,cv2,numpy as np,random
-U="http://localhost:5001";P="48AW5fAB";C="http://localhost:8080/snapshot?topic=/camera_pkg/display_mjpeg"
+U="http://localhost:5001";P="${DEEPRACER_API_PASSWORD}";C="http://localhost:8080/snapshot?topic=/camera_pkg/display_mjpeg"
 st="idle";tm=0;dc=0;cf=False;ign=0.0
 
 def el():

@@ -9,7 +9,7 @@ Reporte completo de cómo se conecta OWL al AWS DeepRacer para control de movimi
 - **IP LAN:** `10.203.150.56`
 - **Tipo de red:** WiFi local (no Tailscale; la IP de Tailscale no ha sido proporcionada)
 - **Usuario:** `deepracer`
-- **Contraseña SSH:** `Steambog1$`
+- **Contraseña SSH:** `${DEEPRACER_SSH_PASSWORD}`
 - **Uso:** Se usa para subir y ejecutar scripts bash directamente en el vehículo vía Paramiko (Python). El script de drive_test se copia por SFTP a `/tmp/drive_test.sh` y se ejecuta por SSH.
 
 ---
@@ -18,7 +18,7 @@ Reporte completo de cómo se conecta OWL al AWS DeepRacer para control de movimi
 
 - **Puerto:** `5001`
 - **Protocolo:** HTTP (no HTTPS desde dentro del vehículo; el backend usa HTTPS con `rejectUnauthorized: false` para el certificado autofirmado)
-- **Contraseña de la API:** `48AW5fAB` (diferente de la contraseña SSH)
+- **Contraseña de la API:** `${DEEPRACER_API_PASSWORD}` (diferente de la contraseña SSH)
 
 ### Flujo de autenticación CSRF
 
@@ -32,7 +32,7 @@ Reporte completo de cómo se conecta OWL al AWS DeepRacer para control de movimi
    <input name="csrf_token" value="TOKEN_AQUI">
    ```
 3. **POST /login** → Se envía el formulario con:
-   - Body: `csrf_token=TOKEN&password=48AW5fAB`
+   - Body: `csrf_token=TOKEN&password=${DEEPRACER_API_PASSWORD}`
    - Header: `X-CSRF-Token: TOKEN`
    - Header: `Content-Type: application/x-www-form-urlencoded`
    - Cookie: la cookie de sesión obtenida del GET anterior

@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Login inyectando la cookie Secure manualmente."""
 import paramiko
+import os, shlex
+
+api_password = shlex.quote(os.environ["DEEPRACER_API_PASSWORD"])
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('10.203.150.56', username='deepracer', password='Steambog1$', timeout=10)
+ssh.connect(__import__("os").environ["DEEPRACER_HOST"], username=__import__("os").environ["DEEPRACER_SSH_USER"], password=__import__("os").environ["DEEPRACER_SSH_PASSWORD"], timeout=10)
 
 sftp = ssh.open_sftp()
 with sftp.open('/tmp/debug_login3.sh', 'w') as f:
-    f.write(r"""#!/bin/bash
+    f.write((r"""#!/bin/bash
 
 # PASO 1: GET login, capturar headers para extraer Set-Cookie
 echo "=== PASO 1: GET /login ==="
@@ -33,12 +36,12 @@ echo "=== PASO 2: POST /login ==="
 curl -v -s -b /tmp/cookies.txt -c /tmp/cookies.txt \
   -X POST http://localhost:5001/login \
   -H "X-CSRFToken: $CSRF" \
-  -d "password=Steambog1\$"
+  -d "password=${DEEPRACER_API_PASSWORD}"
 echo ""
 
 echo "=== COOKIES AFTER POST ==="
 cat /tmp/cookies.txt
-""")
+""").replace("${DEEPRACER_API_PASSWORD}", api_password))
 sftp.close()
 
 stdin, stdout, stderr = ssh.exec_command('chmod +x /tmp/debug_login3.sh && bash /tmp/debug_login3.sh', timeout=15)

@@ -8,7 +8,7 @@ Usage:
 
 Requires:
   - pyserial: pip3 install pyserial (or apt install python3-serial)
-  - User in dialout group OR sudo access (password: Steambog1$)
+  - User in dialout group OR sudo access (password: ${DEEPRACER_SSH_PASSWORD})
 
 ⚠️  DTR/RTS must be disabled when opening the ESP32 serial port,
     otherwise the chip resets immediately (CP2102 bridges DTR to EN).

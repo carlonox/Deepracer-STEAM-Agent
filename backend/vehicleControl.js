@@ -1,15 +1,23 @@
 // backend/vehicleControl.js
 import https from "https";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { URLSearchParams } from "url";
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 // ===================== CONFIG =====================
-const HOST = process.env.HOST;
-const PORT = process.env.AWS_PORT;
+const HOST = process.env.DEEPRACER_HOST;
+const PORT = process.env.DEEPRACER_API_PORT;
 const LOGIN_PATH = "/login";
-const PASSWORD = process.env.PASSWORD;
+const PASSWORD = process.env.DEEPRACER_API_PASSWORD;
+const keepAliveAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 4,
+  rejectUnauthorized: false,
+});
 
 // Extraído para no repetir la cadena en múltiples lugares
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
@@ -41,6 +49,7 @@ async function findCsrf() {
     port: PORT,
     path: LOGIN_PATH,
     method: "GET",
+    agent: keepAliveAgent,
     rejectUnauthorized: false,
     headers: { Accept: "text/html", "User-Agent": USER_AGENT },
   };
@@ -64,6 +73,7 @@ async function authenticate() {
     port: PORT,
     path: LOGIN_PATH,
     method: "POST",
+    agent: keepAliveAgent,
     rejectUnauthorized: false,
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -102,6 +112,7 @@ async function putJson(path, jsonObj) {
     port: PORT,
     path,
     method: "PUT",
+    agent: keepAliveAgent,
     rejectUnauthorized: false,
     headers: {
       Accept: "*/*",
@@ -117,12 +128,19 @@ async function putJson(path, jsonObj) {
     },
   };
 
-  try {
-    const response = await requestOnce(opts, jsonData);
-    if (response.res.statusCode === 401 || response.res.statusCode === 403) {
+  const assertOk = (response) => {
+    const status = response.res.statusCode;
+    if (status === 401 || status === 403) {
       throw new Error("Session expired");
     }
+    if (status < 200 || status >= 300) {
+      throw new Error(`DeepRacer ${path} respondio HTTP ${status}: ${response.data}`);
+    }
     return response;
+  };
+
+  try {
+    return assertOk(await requestOnce(opts, jsonData));
   } catch (err) {
     console.warn("⚠️ Error con sesión actual, reautenticando...");
     session = await authenticate();
@@ -136,7 +154,7 @@ async function putJson(path, jsonObj) {
       },
     };
     
-    return await requestOnce(retryOpts, jsonData);
+    return assertOk(await requestOnce(retryOpts, jsonData));
   }
 }
 
@@ -175,6 +193,7 @@ export async function getVideoStream() {
       port: PORT,
       path: "/route?topic=/camera_pkg/display_mjpeg&width=480&height=360",
       method: "GET",
+      agent: keepAliveAgent,
       rejectUnauthorized: false,
       headers: {
         Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",

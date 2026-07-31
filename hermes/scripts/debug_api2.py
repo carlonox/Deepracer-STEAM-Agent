@@ -4,7 +4,7 @@ import paramiko
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('10.203.150.56', username='deepracer', password='Steambog1$', timeout=10)
+ssh.connect(__import__("os").environ["DEEPRACER_HOST"], username=__import__("os").environ["DEEPRACER_SSH_USER"], password=__import__("os").environ["DEEPRACER_SSH_PASSWORD"], timeout=10)
 
 # Ver que hay en el proyecto deepracerweb
 stdin, stdout, stderr = ssh.exec_command('ls -la /home/deepracer/Desktop/deepracerweb/ 2>/dev/null || echo "No existe"')

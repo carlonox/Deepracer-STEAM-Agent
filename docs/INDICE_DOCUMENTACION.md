@@ -63,7 +63,7 @@ Este documento indexa y clasifica toda la documentación del proyecto SpeedRacer
 
 | Archivo | Tipo | Resumen | Relevancia |
 |---------|------|---------|------------|
-| `README.md` | MD (61 líneas) | Guía completa para acceso SSH al DeepRacer: credenciales `deepracer/Steambog1$`, habilitación de SSH, comandos de conexión | **Alta** - Credenciales SSH y guía de acceso |
+| `README.md` | MD (61 líneas) | Guía completa para acceso SSH al DeepRacer: credenciales `deepracer/${DEEPRACER_SSH_PASSWORD}`, habilitación de SSH, comandos de conexión | **Alta** - Credenciales SSH y guía de acceso |
 | `README.pdf` | PDF | Versión PDF de la guía SSH | Baja |
 | `media/` | IMG | 5 imágenes: car_connected.gif, login.jpg, enable_ssh.jpg, ssh_status.jpg, ssh_access.png | Ilustrativas |
 
@@ -90,7 +90,7 @@ Este documento indexa y clasifica toda la documentación del proyecto SpeedRacer
 
 1. **Credenciales SSH** (de `1_Operating_System_Access_And_SSH/README.md`):
    - Usuario: `deepracer`
-   - Contraseña: `Steambog1$`
+   - Contraseña: `${DEEPRACER_SSH_PASSWORD}`
    - IP: obtener vía `ip addr` en el dispositivo
 
 2. **Ejemplos de control ROS2** (de `ayuda_proximo_avance.md`):

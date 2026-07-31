@@ -73,7 +73,7 @@ SSH es la forma de acceder al vehículamente remotamente desde tu computadora.
 | Campo | Valor |
 |-------|-------|
 | **Usuario** | `deepracer` |
-| **Contraseña** | `Steampog1$` |
+| **Contraseña** | `${DEEPRACER_SSH_PASSWORD}` |
 
 ### Conectarse desde tu computadora
 
@@ -145,7 +145,7 @@ El backend se autentica con el servidor del DeepRacer mediante:
 
 | Detalle | Valor |
 |---------|-------|
-| **Contraseña del servidor del vehículo** | `48AW5fAB` |
+| **Contraseña del servidor del vehículo** | `${DEEPRACER_API_PASSWORD}` |
 | **Servidor de control** | `localhost:5001` (cuando se accede desde el vehículo) |
 | **Protocolo** | HTTP (configurable a HTTPS) |
 
@@ -629,7 +629,7 @@ import time
 class DeepRacerWebAPI:
     """Cliente para controlar el DeepRacer vía API Web."""
 
-    def __init__(self, ip_address: str, password: str = "48AW5fAB"):
+    def __init__(self, ip_address: str, password: str = "${DEEPRACER_API_PASSWORD}"):
         self.base_url = f"http://{ip_address}"
         self.password = password
         self.session = requests.Session()
@@ -767,7 +767,7 @@ curl -X POST http://IP_DEEPRACER:5001/api/start_stop \
 |---------|---------------|----------|
 | `Connection refused` | SSH no está activo | Ejecutar `sudo systemctl start sshd` en el vehículo |
 | `Connection timeout` | Diferente red | Verificar que ambos estén en la misma red Wi-Fi |
-| `Permission denied` | Credenciales incorrectas | Verificar usuario `deepracer` y contraseña `Steampog1$` |
+| `Permission denied` | Credenciales incorrectas | Verificar usuario `deepracer` y contraseña `${DEEPRACER_SSH_PASSWORD}` |
 | `Host key changed` | Reimagen del vehículo | Ejecutar `ssh-keygen -R IP_DEL_DEEPRACER` |
 
 ### El vehículo no se mueve
@@ -813,7 +813,7 @@ curl -X POST http://IP_DEEPRACER:5001/api/start_stop \
 | Valor | Ubicación | Descripción |
 |-------|-----------|-------------|
 | `localhost:5001` | `backend/vehicleControl.js` | API de control del DeepRacer |
-| `48AW5fAB` | `backend/vehicleControl.js`, `move.js` | Contraseña del servidor del vehículo |
+| `${DEEPRACER_API_PASSWORD}` | `backend/vehicleControl.js`, `move.js` | Contraseña del servidor del vehículo |
 | `10.203.139.55:443` | `backend/vehicleControl.js` | Fuente del stream de cámara |
 | `5002` | `backend/server.js` | Puerto del backend Express |
 | `localhost:5002` | `src/services/vehicleApi.js` | Destino de la API del frontend |

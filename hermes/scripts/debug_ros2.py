@@ -5,7 +5,7 @@ import time
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('10.203.150.56', username='deepracer', password='Steambog1$', timeout=10)
+ssh.connect(__import__("os").environ["DEEPRACER_HOST"], username=__import__("os").environ["DEEPRACER_SSH_USER"], password=__import__("os").environ["DEEPRACER_SSH_PASSWORD"], timeout=10)
 print("SSH OK")
 
 def run(ssh, cmd, label="", timeout=15):

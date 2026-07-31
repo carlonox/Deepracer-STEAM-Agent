@@ -69,10 +69,10 @@ The DeepRacer has a **small push button on the main circuit board** that physica
 
 | Service | Username | Password | Port |
 |---------|----------|----------|------|
-| SSH | `deepracer` | `Steambog1$` | 22 |
-| Web API | — | `48AW5fAB` | 5001 (HTTP/HTTPS) |
+| SSH | `deepracer` | `${DEEPRACER_SSH_PASSWORD}` | 22 |
+| Web API | — | `${DEEPRACER_API_PASSWORD}` | 5001 (HTTP/HTTPS) |
 
-> **⚠️ Two different passwords!** SSH and web API use different credentials. The `$` in the SSH password must be quoted in bash: `'Steambog1$'`.
+> **⚠️ Two different passwords!** SSH and web API use different credentials. The `$` in the SSH password must be quoted in bash: `'${DEEPRACER_SSH_PASSWORD}'`.
 
 > **🔐 Password mechanism**: The web API password is stored as a hash in `/opt/aws/deepracer/password.txt` on the robot. The default password is generated from the hardware serial number at `/sys/class/dmi/id/chassis_asset_tag`. To reset it, there's a script at `/opt/aws/deepracer/nginx/reset_default_password.py`. A device token exists at `/opt/aws/deepracer/token.txt` (UUID format).
 
@@ -82,10 +82,10 @@ The DeepRacer has a **small push button on the main circuit board** that physica
 
 ```bash
 ssh deepracer@10.203.150.56
-# Enter password when prompted: Steambog1$
+# Enter password when prompted: ${DEEPRACER_SSH_PASSWORD}
 ```
 
-The `$` must be protected from shell expansion — use single quotes: `'Steambog1$'`.
+The `$` must be protected from shell expansion — use single quotes: `'${DEEPRACER_SSH_PASSWORD}'`.
 
 #### From Non-Interactive Environment (Container / Script / Automation)
 
@@ -99,11 +99,11 @@ ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no \
 
 **Why this matters**: Without these flags, SSH tries publickey first (fails), then falls back to password — but with no TTY it can't prompt, so it sends an empty password 3 times and exits with `Permission denied (publickey,password)`. You never see a password: prompt.
 
-**Password-escaping by context**: The `$` in `Steambog1$` is only special in shell contexts:
-- In **bash** single-quote it: `'Steambog1$'` (double quotes do NOT protect `$` — it's still expanded)
+**Password-escaping by context**: The `$` in `${DEEPRACER_SSH_PASSWORD}` is only special in shell contexts:
+- In **bash** single-quote it: `'${DEEPRACER_SSH_PASSWORD}'` (double quotes do NOT protect `$` — it's still expanded)
 - In **PowerShell**: in a here-string `@"..."@` the `$` is literal. In regular PowerShell strings, escape as `` `$ ``.
-- In **Python strings** (paramiko, subprocess): `"Steambog1$"` — plain text, no escaping needed
-- In **JavaScript/Node.js**: `"Steambog1$"` — plain text, no escaping needed
+- In **Python strings** (paramiko, subprocess): `"${DEEPRACER_SSH_PASSWORD}"` — plain text, no escaping needed
+- In **JavaScript/Node.js**: `"${DEEPRACER_SSH_PASSWORD}"` — plain text, no escaping needed
 
 **Python pty helper** — for writing the password to SSH's prompt via subprocess:
 
@@ -128,7 +128,7 @@ for _ in range(50):
         output += data
         if b"password:" in output.lower():
             time.sleep(0.2)
-            os.write(master_fd, b"Steambog1$\n")
+            os.write(master_fd, b"${DEEPRACER_SSH_PASSWORD}\n")
             break
 os.close(master_fd)
 p.wait()
@@ -243,7 +243,7 @@ This distinction saves 10+ minutes of guessing every time.
 The DeepRacer's web server uses a CSRF-protected login:
 
 1. `GET /login` → extract CSRF token from `<meta name="csrf-token"` or `<input name="csrf_token"`
-2. `POST /login` with body `csrf_token=<TOKEN>&password=48AW5fAB` and header `X-CSRF-Token: <TOKEN>`
+2. `POST /login` with body `csrf_token=<TOKEN>&password=${DEEPRACER_API_PASSWORD}` and header `X-CSRF-Token: <TOKEN>`
 3. Session cookie has `Secure` flag — must be injected manually for HTTP requests
 
 ## Movement Control
@@ -465,9 +465,9 @@ backend/
 ```
 HOST=<DeepRacer LAN IP>
 AWS_PORT=5001
-PASSWORD=48AW5fAB
+PASSWORD=${DEEPRACER_API_PASSWORD}
 SSH_USER=deepracer
-SSH_PASS=Steambog1$
+SSH_PASS=${DEEPRACER_SSH_PASSWORD}
 SSH_PORT=22
 PORT=5002                # Backend's own port
 ```
@@ -568,7 +568,7 @@ cookie = re.search(r'session=([^;]+)', resp)
 # 2. Authenticate
 ssh.exec_command(
     f'curl -s -b "session={ck}" -X POST http://localhost:5001/login '
-    f'-H "X-CSRFToken: {csrft}" -d "password=48AW5fAB"', timeout=5)
+    f'-H "X-CSRFToken: {csrft}" -d "password=${DEEPRACER_API_PASSWORD}"', timeout=5)
 
 # 3. Set LED to green
 i,o,e = ssh.exec_command(
@@ -753,8 +753,8 @@ The DeepRacer project uses **two separate web dashboards** for different purpose
 
 | Dashboard | URL | Purpose | Auth |
 |-----------|-----|---------|------|
-| **Hermes Dashboard** | `http://localhost:9999/login` | Hermes Agent web UI (chat, agent config) | admin / steambogadm |
-| **DeepRacer Dashboard** | `http://<robot-ip>/login` | Robot control (drive, camera, calibration) | password: 48AW5fAB |
+| **Hermes Dashboard** | `http://localhost:9999/login` | Hermes Agent web UI (chat, agent config) | admin / ${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD} |
+| **DeepRacer Dashboard** | `http://<robot-ip>/login` | Robot control (drive, camera, calibration) | password: ${DEEPRACER_API_PASSWORD} |
 
 ### 🏗️ Dashboard Architecture (nginx + Flask)
 
@@ -880,7 +880,7 @@ The same password may appear with different spellings in different files. Cross-
 - Scripts in `hermes/scripts/*.py` — these contain the **working** password (paramiko connect calls)
 - `hermes/memories/MEMORY.md` — working credentials summary
 - `hermes/memories/session_*.md` — detailed session notes
-- `docs/GUIA_SETUP.md` — **may have typos**. SSH password appears as `Steampog1$` (with 'p') in GUIA_SETUP.md but all working scripts use `Steambog1$` (with 'b'). The example IP in GUIA_SETUP.md is `10.203.139.55` while actual scripts use `10.203.150.56`. Trust the scripts, not the setup guide.
+- `docs/GUIA_SETUP.md` — **may have typos**. SSH password appears as `${DEEPRACER_SSH_PASSWORD}` (with 'p') in GUIA_SETUP.md but all working scripts use `${DEEPRACER_SSH_PASSWORD}` (with 'b'). The example IP in GUIA_SETUP.md is `10.203.139.55` while actual scripts use `10.203.150.56`. Trust the scripts, not the setup guide.
 - `.env.example` — variable name template (names may not match what the code actually reads)
 
 > **[1] The `p`→`b` typo in GUIA_SETUP.md is a 30-minute trap.** One character difference stops SSH from working. Always cross-reference at least one working script's credentials against the setup guide before declaring a password invalid.
@@ -1051,7 +1051,7 @@ The `deepracer` user is **not** in the `dialout` group by default, so accessing 
 
 ### Sudo Password Handling
 
-The sudo password is the **same as SSH** (`Steambog1$`), but **do not pipe it via `sudo -S`** — security scanners detect and block this pattern. Instead, use one of these approaches:
+The sudo password is the **same as SSH** (`${DEEPRACER_SSH_PASSWORD}`), but **do not pipe it via `sudo -S`** — security scanners detect and block this pattern. Instead, use one of these approaches:
 
 **Approach 1: invoke_shell() with paramiko** (recommended for agents)
 ```python
@@ -1059,7 +1059,7 @@ import paramiko, time
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('<IP>', username='deepracer', password='Steambog1$', timeout=10)
+ssh.connect('<IP>', username='deepracer', password='${DEEPRACER_SSH_PASSWORD}', timeout=10)
 
 channel = ssh.invoke_shell()
 time.sleep(1)
@@ -1067,7 +1067,7 @@ if channel.recv_ready(): channel.recv(4096)  # clear prompt
 
 channel.send("sudo i2cdetect -y 1\n")
 time.sleep(0.5)
-channel.send("Steambog1$\n")
+channel.send("${DEEPRACER_SSH_PASSWORD}\n")
 time.sleep(2)
 
 output = b""
@@ -1085,7 +1085,7 @@ cat > /tmp/sudo_scan.sh << 'EOF'
 #!/bin/bash
 source /opt/ros/foxy/setup.bash
 source /opt/aws/deepracer/lib/setup.bash
-echo "Steambog1$" | sudo -S i2cdetect -y 1
+echo "${DEEPRACER_SSH_PASSWORD}" | sudo -S i2cdetect -y 1
 EOF
 
 # Then run it in one exec_command (no piping from outside)
@@ -1354,7 +1354,7 @@ Update the drive daemon's `COMMANDS` dict accordingly. This is a known quirk on 
 **If ping succeeds but SSH/API/camera all timeout:** robot may be on but firewalled (iptables default DROP + fail2ban). User needs to add `-s 10.0.0.0/8 -j ACCEPT` rule.
 **Try Tailscale IP** (`100.117.192.31`) as alternative if LAN IP fails — some networks isolate Docker from LAN but allow Tailscale. |
 | **Robot doesn't move (hardware OK)** | **Throttle convention inverted** — web API uses positive=forward, but skill historically said negative=forward (ROS2 convention). | Use positive throttle for forward via web API. See #1 Pitfall above. |
-| SSH: Permission denied | Wrong password or SSH keys need regeneration | Use `'Steambog1$'` (single quotes); on robot: `sudo ssh-keygen -A` |
+| SSH: Permission denied | Wrong password or SSH keys need regeneration | Use `'${DEEPRACER_SSH_PASSWORD}'` (single quotes); on robot: `sudo ssh-keygen -A` |
 | SSH: Connection timeout | Wrong IP or network isolation | Verify LAN IP with ping; check Tailscale vs LAN |
 | SSH: Intermittent — connects once then times out | Firewall (iptables policy DROP + fail2ban) after failed auth attempts, OR WiFi power management on robot | Check `sudo iptables -L -n` for `(policy DROP)` on INPUT chain and `f2b-sshd` chain. Fix: `sudo iptables -I INPUT 1 -s 10.0.0.0/8 -j ACCEPT` (verify it's rule #1). If firewall is clean, suspect WiFi: check `iwconfig wlan0` for signal strength, reboot robot as last resort |
 | Web API: Connection timeout from Docker | Port 5001 firewalled from Docker container | Use SSH for commands (port 22 works from Docker); camera stream (port 8080) also works from Docker; deploy backend proxy on host as fallback |

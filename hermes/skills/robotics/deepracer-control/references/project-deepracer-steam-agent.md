@@ -13,10 +13,10 @@ Actual working values for this specific project (Deepracer-STEAM-Agent).
 
 | Service | Username | Password | Port |
 |---------|----------|----------|------|
-| SSH | `deepracer` | `Steambog1$` | 22 |
-| Web API | — | `48AW5fAB` | 5001 |
+| SSH | `deepracer` | `${DEEPRACER_SSH_PASSWORD}` | 22 |
+| Web API | — | `${DEEPRACER_API_PASSWORD}` | 5001 |
 
-⚠️ The SSH password is `Steambog1$` (with **b**), NOT `Steampog1$` as written in some documentation files.
+⚠️ The SSH password is `${DEEPRACER_SSH_PASSWORD}` (with **b**), NOT `${DEEPRACER_SSH_PASSWORD}` as written in some documentation files.
 
 ## Docker Container Setup
 
@@ -55,8 +55,8 @@ This project has **two separate web dashboards**:
 
 | Dashboard | URL | Purpose | Auth |
 |-----------|-----|---------|------|
-| **Hermes Dashboard** | `http://localhost:9999/login` | AI agent chat UI | admin / steambogadm |
-| **DeepRacer Dashboard** | `http://10.203.150.56:5001/login` | Robot control (drive, camera, calibration) | password: `48AW5fAB` |
+| **Hermes Dashboard** | `http://localhost:9999/login` | AI agent chat UI | admin / ${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD} |
+| **DeepRacer Dashboard** | `http://10.203.150.56:5001/login` | Robot control (drive, camera, calibration) | password: `${DEEPRACER_API_PASSWORD}` |
 
 ⚠️ **Do NOT confuse them.** When the user says "dashboard" in the context of the robot, they mean the DeepRacer dashboard (port 5001 on the robot), NOT the Hermes dashboard.
 
@@ -95,16 +95,16 @@ The `rplidarNode` is in the main launch file but fails due to missing ROS2 share
 
 ## Creating the .env File from PowerShell
 
-When creating the backend `.env` from PowerShell, use a here-string to avoid issues with the `$` in `Steambog1$`:
+When creating the backend `.env` from PowerShell, use a here-string to avoid issues with the `$` in `${DEEPRACER_SSH_PASSWORD}`:
 
 ```powershell
 @"
 HOST=10.203.150.56
 SSH_PORT=22
 SSH_USER=deepracer
-SSH_PASS=Steambog1$
+SSH_PASS=${DEEPRACER_SSH_PASSWORD}
 AWS_PORT=5001
-PASSWORD=48AW5fAB
+PASSWORD=${DEEPRACER_API_PASSWORD}
 PORT=5002
 "@ | Out-File -Encoding UTF8 .env
 ```

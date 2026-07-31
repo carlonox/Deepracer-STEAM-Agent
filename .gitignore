@@ -1,4 +1,9 @@
 # === CREDENCIALES Y SECRETOS ===
+.env
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.template
 hermes/config.yaml
 hermes/.env
 hermes/.env.*
@@ -77,6 +82,27 @@ hermes/*.bak*
 # === NODE ===
 backend/node_modules/
 backend/.env
+frontend/node_modules/
+
+# === BUILDS Y CACHES ===
+**/__pycache__/
+**/.pio/
+**/dist/
+*.log
+
+# === ESTADO GENERADO DE HERMES ===
+hermes/skills/.hub/
+hermes/projects.db
+hermes/*.db
+hermes/*.db-*
+hermes/state/
+hermes/tui-theme-boot.json
+hermes/ollama_cloud_models_cache.json
+hermes/provider_models_cache.json
+hermes/verification_evidence.db
+
+# === SECRETOS DE FIRMWARE ===
+esp32_camera_udp/include/secrets.h
 
 # === WINDOWS ===
 Thumbs.db

@@ -10,7 +10,7 @@ Tests: forward → brake → reverse → turn left → turn right → stop
 import requests, re, time, sys
 
 ROBOT_URL = "http://localhost:5001"
-PASSWORD = "48AW5fAB"
+PASSWORD = __import__("os").environ["DEEPRACER_API_PASSWORD"]
 session = requests.Session()
 
 

@@ -28,6 +28,11 @@ Write-Host "  Imagen OK" -ForegroundColor Green
 Write-Host "[3/5] Iniciando Hermes (gateway mode)..." -ForegroundColor Yellow
 docker compose up -d hermes
 Start-Sleep -Seconds 8
+if (-not (docker compose ps --status running --services | Select-String -SimpleMatch "hermes")) {
+    Write-Host "  ERROR: Hermes no quedo en ejecucion" -ForegroundColor Red
+    docker compose logs --tail 80 hermes
+    exit 1
+}
 Write-Host "  Hermes iniciado" -ForegroundColor Green
 
 # 4. Iniciar backend
@@ -40,7 +45,9 @@ Write-Host "  Backend iniciado" -ForegroundColor Green
 Write-Host "[5/5] Verificando servicios..." -ForegroundColor Yellow
 
 try {
-    $hermes = Invoke-RestMethod -Uri http://localhost:8642/health -TimeoutSec 5 -ErrorAction Stop
+    # El dashboard siempre esta disponible cuando HERMES_DASHBOARD=1. La API
+    # del agente en 8642 puede estar deshabilitada en versiones nuevas.
+    $hermes = Invoke-WebRequest -Uri http://localhost:9999/login -MaximumRedirection 0 -TimeoutSec 5 -ErrorAction Stop
     Write-Host "  Hermes: OK" -ForegroundColor Green
 } catch {
     Write-Host "  Hermes: ERROR (revisa docker compose logs hermes)" -ForegroundColor Red

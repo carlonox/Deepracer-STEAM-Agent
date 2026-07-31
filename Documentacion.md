@@ -365,7 +365,7 @@ dashboard:
   basic_auth:
     username: admin
     password: <contraseña_en_texto_plano>
-    secret: "***REMOVED***"
+    secret: "${HERMES_DASHBOARD_BASIC_AUTH_SECRET}"
 ```
 
 **Descubrimiento:** El campo `password` (no `password_hash`) con el campo `secret` es aceptado cuando se configura via `hermes config set` dentro del container. El setup wizard se encarga de generar el hash internamente.
@@ -407,7 +407,7 @@ RUN uv pip install paramiko
 **Verificación de que el backend SÍ funciona:**
 ```powershell
 # Autenticación via header HTTP funciona perfectamente
-$pair = "admin:steambogadm"
+$pair = "admin:${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD}"
 $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
 $base64 = [Convert]::ToBase64String($bytes)
 $authHeader = "Basic $base64"
@@ -450,7 +450,7 @@ services:
       - HERMES_DASHBOARD=1
       - API_SERVER_ENABLED=true
       - API_SERVER_HOST=0.0.0.0
-      - API_SERVER_KEY=deepracer-steam-agent-2026-secret
+      - API_SERVER_KEY=${API_SERVER_KEY}
 ```
 
 **config.yaml (versión final funcional):**
@@ -471,7 +471,7 @@ dashboard:
   basic_auth:
     username: admin
     password: <contraseña>
-    secret: "***REMOVED***"
+    secret: "${HERMES_DASHBOARD_BASIC_AUTH_SECRET}"
 terminal:
   backend: local
   cwd: /workspace
@@ -760,7 +760,7 @@ docker exec deepracer-agent s6-rc -a list
 curl.exe -s http://localhost:9999/api/status
 
 # Health check con auth
-$pair = "admin:steambogadm"
+$pair = "admin:${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD}"
 $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
 $base64 = [Convert]::ToBase64String($bytes)
 curl.exe -s -H "Authorization: Basic $base64" http://localhost:9999/api/status

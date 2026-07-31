@@ -12,7 +12,7 @@ The DeepRacer had **two serial devices** connected. The user had assumed both we
 import paramiko
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('10.203.150.56', username='deepracer', password='Steambog1$', timeout=15)
+ssh.connect('10.203.150.56', username='deepracer', password='${DEEPRACER_SSH_PASSWORD}', timeout=15)
 
 # 1. List USB devices — shows USB-UART bridge chips
 stdin, stdout, stderr = ssh.exec_command('lsusb', timeout=10)

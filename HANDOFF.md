@@ -11,12 +11,12 @@
 |----------|---------|
 | **IP LAN** | `10.203.150.56` |
 | **IP Tailscale** | `100.117.192.31` |
-| **SSH** | `deepracer` / `Steambog1$` |
+| **SSH** | `deepracer` / `${DEEPRACER_SSH_PASSWORD}` |
 | **Sudo** | Misma contraseña que SSH |
-| **API Web** | `http://10.203.150.56:5001/login` — pass: `48AW5fAB` |
+| **API Web** | `http://10.203.150.56:5001/login` — pass: `${DEEPRACER_API_PASSWORD}` |
 | **Dashboard DeepRacer** | `http://10.203.150.56:5001/login` |
 | **Camara stream** | `http://10.203.150.56:8080/stream_viewer?topic=/camera_pkg/display_mjpeg` |
-| **Hermes Dashboard** | `http://localhost:9999/login` — admin/steambogadm |
+| **Hermes Dashboard** | `http://localhost:9999/login` — admin/${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD} |
 
 ### ⚠️ Problemas de conexión conocidos
 - SSH es **intermitente** — a veces conecta, a veces timeout. Persistir.
