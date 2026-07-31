@@ -9,7 +9,7 @@ Usage: python3 drive_and_listen.py  (run on the robot)
 import serial, requests, re, time, sys, threading
 
 ROBOT_URL = "http://localhost:5001"
-PASSWORD = "48AW5fAB"
+PASSWORD = __import__("os").environ["DEEPRACER_API_PASSWORD"]
 ESP_PORT = "/dev/ttyUSB0"
 BAUD = 115200
 

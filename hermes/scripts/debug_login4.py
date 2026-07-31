@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Login con csrf_token en body + cookie inyectada."""
 import paramiko
+import os, shlex
+
+api_password = shlex.quote(os.environ["DEEPRACER_API_PASSWORD"])
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('10.203.150.56', username='deepracer', password='Steambog1$', timeout=10)
+ssh.connect(__import__("os").environ["DEEPRACER_HOST"], username=__import__("os").environ["DEEPRACER_SSH_USER"], password=__import__("os").environ["DEEPRACER_SSH_PASSWORD"], timeout=10)
 
 sftp = ssh.open_sftp()
 with sftp.open('/tmp/debug_login4.sh', 'w') as f:
-    f.write(r"""#!/bin/bash
+    f.write((r"""#!/bin/bash
 
 # PASO 1: GET login, extraer cookie y CSRF
 HEADERS=$(curl -s -D - http://localhost:5001/login 2>/dev/null)
@@ -27,9 +30,9 @@ curl -v -s -b /tmp/cookies.txt -c /tmp/cookies.txt \
   -X POST http://localhost:5001/login \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "X-CSRFToken: $CSRF" \
-  -d "csrf_token=$CSRF&password=Steambog1\$"
+  -d "csrf_token=$CSRF&password=${DEEPRACER_API_PASSWORD}"
 echo ""
-""")
+""").replace("${DEEPRACER_API_PASSWORD}", api_password))
 sftp.close()
 
 stdin, stdout, stderr = ssh.exec_command('chmod +x /tmp/debug_login4.sh && bash /tmp/debug_login4.sh', timeout=15)

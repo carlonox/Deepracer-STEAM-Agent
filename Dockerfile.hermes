@@ -1,3 +1,10 @@
 FROM nousresearch/hermes-agent:latest
+
+# Some published Hermes images route password-only providers through the OAuth
+# endpoint.  Keep the image usable until that upstream dashboard fix reaches
+# the container tag: /auth/login must return to the password form for the
+# built-in "basic" provider instead of calling start_login().
+RUN python -c 'from pathlib import Path; p=Path("/opt/hermes/hermes_cli/dashboard_auth/routes.py"); s=p.read_text(); old="    try:\n        ls = p.start_login(redirect_uri=_redirect_uri(request))"; new="    if getattr(p, \"supports_password\", False):\n        from urllib.parse import quote\n        safe_next = _validate_post_login_target(next)\n        login_url = f\"{_prefix(request)}/login\"\n        if safe_next:\n            login_url = f\"{login_url}?next={quote(safe_next, safe=chr(39))}\"\n        return RedirectResponse(url=login_url, status_code=302)\n    try:\n        ls = p.start_login(redirect_uri=_redirect_uri(request))"; assert old in s or new in s, "Unsupported Hermes dashboard-auth layout"; p.write_text(s if new in s else s.replace(old, new, 1))'
+
 RUN uv pip install paramiko
 CMD ["gateway", "run"]

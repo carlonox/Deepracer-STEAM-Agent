@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""explore_ros2.py - Explora topics ROS2 del DeepRacer vía SSH (paramiko)."""
+"""explore_ros2.py - Explora topics ROS2 del DeepRacer vÃ­a SSH (paramiko)."""
 import paramiko
 import time
 
-HOST = "100.117.192.31"
-USER = "deepracer"
-PASS = "Steambog1$"
-
+HOST = __import__("os").environ["DEEPRACER_HOST"]
+USER = __import__("os").environ["DEEPRACER_SSH_USER"]
+PASS = __import__("os").environ["DEEPRACER_SSH_PASSWORD"]
 def run(ssh, cmd, timeout=15):
     stdin, stdout, stderr = ssh.exec_command(cmd, timeout=timeout)
     out = stdout.read().decode().strip()
@@ -64,4 +63,4 @@ for t in relevant:
         print("(sin datos)")
 
 ssh.close()
-print("\n=== EXPLORACIÓN COMPLETA ===")
+print("\n=== EXPLORACIÃ“N COMPLETA ===")

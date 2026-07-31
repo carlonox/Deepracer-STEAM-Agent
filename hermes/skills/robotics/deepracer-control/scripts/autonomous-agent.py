@@ -21,7 +21,7 @@ Pair with brake LED:
 import serial, requests, re, time, threading
 
 ROBOT_URL = "http://localhost:5001"
-PASSWORD = "48AW5fAB"
+PASSWORD = __import__("os").environ["DEEPRACER_API_PASSWORD"]
 ESP_PORT = "/dev/ttyUSB0"
 PATTERN_GAP = 0.8  # max seconds between claps for multi-clap pattern
 
