@@ -250,6 +250,17 @@ The DeepRacer's web server uses a CSRF-protected login:
 
 ## Movement Control
 
+### 🔀 Control path preference (user, 2026-07-31 — explicit twice)
+
+**ALL driving goes through the Node backend (`apps/backend`, port 5002) —
+NEVER SSH for movement.** The user said it plainly: "para controlar el robot
+usas el backend de node... nada de ssh". SSH is for maintenance/diagnostics
+only (clock sync, firewall, deploying robot-side scripts, hardware checks).
+The backend applies throttle calibration (`THROTTLE_DEAD_ZONE`) and steering
+trim (`STRAIGHT_ANGLE_OFFSET`) automatically; robot-side scripts (daemon,
+explorer) that talk to the robot's local API must replicate the calibration
+functions if used at all.
+
 ### Required Sequence (always follow this order)
 
 ```
@@ -269,6 +280,17 @@ PUT /api/manual_drive { "angle": X, "throttle": Y, "max_speed": Z }  # 3. Move (
 ### ⚠️ Watchdog Timer
 
 The firmware has a **~200ms watchdog**. If no new command arrives within that window, motors stop automatically. Commands must be sent in a tight loop **without sleep/pause** between them (50-100ms interval recommended).
+
+**🕳️ Pitfall — synchronous command loops starve the watchdog (verified 2026-07-31).**
+Waiting for each API response (container → backend → robot → back) yields only
+~5-10 Hz effective (one command every ~170-220 ms) — right at/over the 200 ms
+watchdog edge: the motors keep cutting and the robot does NOT move (or only
+twitches), even with correct throttle, motors enabled, and commands returning
+200. Fix: **fire-and-forget** — POST without waiting for the response
+(`requests.post(..., timeout=0.05)` in a loop with `sleep(0.03)`, ~15-30 Hz
+attempted). Proven live: synchronous loop = no movement at real -0.65;
+fire-and-forget at the same throttle = moves. When the command count per
+second drops below ~8-10 through the backend, suspect the watchdog first.
 
 **🔴 Pitfall — a SYNCHRONOUS loop through the backend starves the watchdog.**
 Sending one `POST /api/manual_drive` and WAITING for each response (container →
@@ -700,6 +722,16 @@ cd apps/backend
 npm install
 npm start   # → http://0.0.0.0:5002 (verificar con GET /api/health)
 ```
+
+**🔄 Backend restart verification (2026-07-31).** `dotenv` reads `.env` ONLY at
+startup — after changing backend code or `.env` values, the running process
+must be restarted or the change is silently inert. When in doubt whether the
+restart actually happened, check `GET /api/health` → `uptime_s`: a fresh small
+uptime means the new code is live (a stale uptime means the old process is
+still running and your change did NOT take effect — this confused a whole
+tuning iteration). For calibration tuning, avoid restarts entirely: use
+`POST /api/calibration {"angle_offset": X}` (live, in-memory) and confirm with
+`GET /api/calibration`. To make a value permanent, edit `.env` and restart.
 
 **Lanzadores del repo (Windows):** `scripts/start/start-services.ps1` arranca
 Hermes + backend y verifica con `/api/health` (nunca `/api/start`);
