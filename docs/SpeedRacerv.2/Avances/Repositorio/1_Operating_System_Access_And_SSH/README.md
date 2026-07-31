@@ -16,7 +16,7 @@ Pasos para acceder al sistema operativo (Ubuntu) del carro y habilitar SSH para 
 2. Inicio de sesión
 	- El sistema operativo es Ubuntu. Credenciales:
 	  - Usuario: deepracer
-	  - Contraseña: `Steambog1$`
+	  - Contraseña: `${DEEPRACER_SSH_PASSWORD}`
 
 	![Pantalla de login](media/login.jpg)
 

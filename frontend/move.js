@@ -1,14 +1,19 @@
 // move_debug.js
 import http from "http";
 import https from "https";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { URLSearchParams } from "url";
 
 //////// CONFIG ////////
-const HOST = "localhost";
-const PORT = 5001;
-const USE_HTTPS = false;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+const HOST = process.env.DEEPRACER_HOST;
+const PORT = Number(process.env.DEEPRACER_API_PORT || 5001);
+const USE_HTTPS = process.env.DEEPRACER_API_HTTPS !== "false";
 const LOGIN_PATH = "/login";
-const PASSWORD = "48AW5fAB";
+const PASSWORD = process.env.DEEPRACER_API_PASSWORD;
 const MOVE_DURATION_MS = 5000;
 const MOVE_INTERVAL_MS = 100;
 const MAX_RETRIES = 3;
@@ -24,10 +29,10 @@ const COLORS = {
   cyan: "\x1b[36m",
 };
 const log = {
-  i: (m) => console.log(`${COLORS.cyan}ℹ️ ${m}${COLORS.reset}`),
-  s: (m) => console.log(`${COLORS.green}✅ ${m}${COLORS.reset}`),
-  w: (m) => console.log(`${COLORS.yellow}⚠️ ${m}${COLORS.reset}`),
-  e: (m) => console.error(`${COLORS.red}❌ ${m}${COLORS.reset}`),
+  i: (m) => console.log(`${COLORS.cyan}â„¹ï¸ ${m}${COLORS.reset}`),
+  s: (m) => console.log(`${COLORS.green}âœ… ${m}${COLORS.reset}`),
+  w: (m) => console.log(`${COLORS.yellow}âš ï¸ ${m}${COLORS.reset}`),
+  e: (m) => console.error(`${COLORS.red}âŒ ${m}${COLORS.reset}`),
 };
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -112,7 +117,7 @@ function extractCsrfFromSessionCookie(setCookieArray) {
   return null;
 }
 
-/** requestOnce: hace la petición y sigue 1 redirect si viene Location */
+/** requestOnce: hace la peticiÃ³n y sigue 1 redirect si viene Location */
 function requestOnce(options, body = null, followRedirectsLeft = 3) {
   return new Promise((resolve, reject) => {
     const req = CLIENT.request(options, (res) => {
@@ -120,7 +125,7 @@ function requestOnce(options, body = null, followRedirectsLeft = 3) {
       res.on("data", (chunk) => (data += chunk));
       res.on("end", async () => {
         const setCookie = res.headers["set-cookie"] || [];
-        // si hay redirect y followRedirectsLeft>0, hacer nueva petición
+        // si hay redirect y followRedirectsLeft>0, hacer nueva peticiÃ³n
         if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308)
             && res.headers.location && followRedirectsLeft > 0) {
           // construir nueva path desde location (si es absoluto o relativo)
@@ -167,7 +172,7 @@ async function findCsrf() {
   log.i(`GET ${LOGIN_PATH} => ${res.statusCode}`);
   const csrf = extractCsrfFromHtml(data) || extractCsrfFromSessionCookie(setCookie);
   if (!csrf) {
-    log.w("No se encontró CSRF en HTML ni en cookies. Muestra truncada de respuesta:");
+    log.w("No se encontrÃ³ CSRF en HTML ni en cookies. Muestra truncada de respuesta:");
     console.log(short(data, 800));
   } else {
     log.s(`CSRF detectado inicial: ${csrf.substring(0, 12)}...`);
@@ -204,7 +209,7 @@ async function loginAndExecute() {
     log.i(`Respuesta login (trunc): ${short(postBody, 400)}`);
 
     if (postRes.statusCode >= 400) {
-      throw new Error(`Login falló: ${postRes.statusCode} ${short(postBody, 400)}`);
+      throw new Error(`Login fallÃ³: ${postRes.statusCode} ${short(postBody, 400)}`);
     }
 
     // Merge cookies after login
@@ -226,7 +231,7 @@ async function loginAndExecute() {
       const cookieBased = extractCsrfFromSessionCookie(postSetCookie || []);
       if (cookieBased) {
         csrf = cookieBased;
-        log.i(`CSRF actualizado desde cookie de sesión: ${csrf.substring(0,12)}...`);
+        log.i(`CSRF actualizado desde cookie de sesiÃ³n: ${csrf.substring(0,12)}...`);
       }
     }
 
@@ -276,7 +281,7 @@ async function loginAndExecute() {
       }
     }
 
-    // pasos: drive_mode -> start -> movimiento contínuo -> stop
+    // pasos: drive_mode -> start -> movimiento contÃ­nuo -> stop
     log.i("Activando modo manual...");
     await postJson("/api/drive_mode", { drive_mode: "manual" });
 
