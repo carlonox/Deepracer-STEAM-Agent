@@ -37,6 +37,23 @@ curl http://localhost:5002/api/health
 vehículo**: nunca deben usarse como prueba automática.
 
 ---
+## Calibración en vivo
+
+`GET /api/calibration` devuelve la calibración activa
+(`straightAngleOffset`, `throttleDeadZone`). `POST /api/calibration` la ajusta
+**sin reiniciar el backend**:
+
+```bash
+curl -X POST http://localhost:5002/api/calibration \
+     -H "Content-Type: application/json" \
+     -d '{"angle_offset": -0.005}'
+```
+
+El offset persiste solo en memoria (el valor inicial sigue siendo el del
+`.env`); para fijarlo de forma permanente edita `STRAIGHT_ANGLE_OFFSET` y
+reinicia.
+
+---
 ## Endpoints
 
 ### POST /api/start
@@ -101,6 +118,19 @@ calibrar.
 
 La dirección (signo) nunca cambia: la convención negativo=adelante la decide el
 consumidor y se verifica por boot.
+
+### 🎯 Calibración de dirección (trim del servo)
+
+`STRAIGHT_ANGLE_OFFSET` (`.env`, por defecto `0`) se suma al `angle` de cada
+comando (`angle_real = clamp(angle + OFFSET)`). Compensa la deriva de dirección
+del robot con angle=0.
+
+Mediciones 2026-07-31 (robot en piso, real -0.65):
+- Offset `0` → deriva ~+2°/s a la derecha (14.5 cm en 1.9 m ≈ 4.4°).
+- Offset `-0.11` → giro ~-40°/s a la izquierda (¡90° en 2.2 s!). El servo es
+  **muy sensible**: ~380°/s por unidad de angle.
+- Valor de trabajo: iterar desde `-0.01` (el centro exacto puede variar con
+  batería, superficie y desgaste).
 
 ### POST /api/manual_drive
 

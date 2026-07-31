@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import path from "path";
 import net from "net";
 import { fileURLToPath } from "url";
-import { startVehicle, stopVehicle, manualDrive, initSession, getVideoStream } from "./vehicleControl.js";
+import { startVehicle, stopVehicle, manualDrive, initSession, getVideoStream, getCalibration, setCalibration } from "./vehicleControl.js";
 import { Client as SSHClient } from "ssh2";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,6 +56,17 @@ app.post("/api/stop", async (req, res) => {
     console.error("Error en /api/stop:", err);
     res.status(500).json({ error: "Error al detener el vehículo" });
   }
+});
+
+// ===================== CALIBRACIÓN EN VIVO =====================
+// Ajusta los parámetros de calibración sin reiniciar el backend.
+// POST /api/calibration {"angle_offset": -0.005} | GET /api/calibration
+app.get("/api/calibration", (req, res) => {
+  res.json(getCalibration());
+});
+app.post("/api/calibration", (req, res) => {
+  const cfg = setCalibration({ angleOffset: req.body?.angle_offset });
+  res.json(cfg);
 });
 
 app.post("/api/manual_drive", async (req, res) => {

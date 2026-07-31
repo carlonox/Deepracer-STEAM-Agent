@@ -718,6 +718,7 @@ Toda modificación futura a esta arquitectura debe añadir una entrada breve:
 |---|---|---|---|---|
 | 2026-07-31 | Adoptar organización por componentes y migración por fases. | Separar fuente, estado, documentación e históricos. | Todo el repositorio. | Ejecutado (fases 0-10); validaciones Docker/PS pendientes en el host. |
 | 2026-07-31 | Cambio funcional: calibración de zona muerta del throttle (THROTTLE_DEAD_ZONE=0.5) en el backend; consumidores envían valores normalizados [-1,1]. | El robot no mueve motores con |throttle| < 0.5 (verificado en vivo); se estira (0,1] a [0.5,1] preservando 0=parada y el signo. | apps/backend/vehicleControl.js, controlcamara.py, scripts del skill (daemon/explorer), .env(.example), GUIA_SETUP, HANDOFF, API.md. | Cambio deliberado e independiente de la migración; autorizado por el usuario; pendiente verificación física con backend reiniciado. |
+| 2026-07-31 | Cambio funcional: trim de dirección (STRAIGHT_ANGLE_OFFSET) + endpoints de calibración en vivo (GET/POST /api/calibration). | Con angle=0 el robot deriva ~4.4° a la derecha por 1.9 m; el servo es muy sensible (-0.11 → giro de 90° en 2 s), se itera desde -0.002/-0.003. | apps/backend/vehicleControl.js, apps/backend/server.js, .env(.example), API.md, skill deepracer-control. | Ajuste en vivo sin reinicios; mediciones de velocidad real: -0.55→0.87 m/s, -0.65→0.83 m/s. |
 
 Si una decisión cambia la estructura objetivo, debe actualizar en el mismo
 cambio el árbol canónico, mapa de migración, reglas de mantenimiento y README

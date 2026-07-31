@@ -76,6 +76,8 @@ POST /login (CSRF + cookie)
 - Watchdog 200ms — loop sin pausa, mínimo 50-100 Hz
 - Throttle invertido: negativo = avanza
 - **Calibración 2026-07-31:** throttle normalizado `[-1,1]` vía backend; zona muerta real ~0.5 (0.45 no mueve, 0.50 sí). Mínimo útil: 0.5 real / 0.1 normalizado. `THROTTLE_DEAD_ZONE=0.5` en `.env`.
+- **Trim de dirección 2026-07-31:** con angle=0 deriva ~4.4° a la derecha por 1.9 m. `STRAIGHT_ANGLE_OFFSET` en `.env` (ajustable en vivo con `POST /api/calibration`). ⚠️ El servo es muy sensible: -0.11 = giro de 90° en 2 s; iterar desde -0.002/-0.003.
+- **Velocidad real 2026-07-31 (cronómetro + cinta):** real -0.55 → ~0.87 m/s; real -0.65 → ~0.83 m/s (dentro del ruido de medición). El mínimo que mueve ya es paso de caminata; máximo estimado 1.6-2 m/s.
 
 **Headers necesarios:**
 ```
