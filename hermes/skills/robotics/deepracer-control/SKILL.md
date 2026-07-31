@@ -270,6 +270,65 @@ PUT /api/manual_drive { "angle": X, "throttle": Y, "max_speed": Z }  # 3. Move (
 
 The firmware has a **~200ms watchdog**. If no new command arrives within that window, motors stop automatically. Commands must be sent in a tight loop **without sleep/pause** between them (50-100ms interval recommended).
 
+**🔴 Pitfall — a SYNCHRONOUS loop through the backend starves the watchdog.**
+Sending one `POST /api/manual_drive` and WAITING for each response (container →
+Windows backend → robot) achieves only ~5-6 Hz end-to-end = a command every
+~180-220 ms, right AT the 200 ms edge: motors twitch or don't move at all while
+every request still returns 200. Verified live 2026-07-31: 9 commands in 1.5 s
+(synchronous) = NO movement; fire-and-forget at ~30 Hz attempted (~15 Hz
+effective) = movement. The pattern that works (only `init` and the final `stop`
+are synchronous):
+
+```python
+def burst(throttle, seconds, base):
+    t0 = time.time()
+    while time.time() - t0 < seconds:
+        try:
+            requests.post(f"{base}/manual_drive",
+                          json={"angle": 0.0, "throttle": throttle, "max_speed": 0.5},
+                          timeout=0.05)
+        except Exception:
+            pass  # fire-and-forget: la petición ya fue enviada
+        time.sleep(0.03)
+```
+
+Watch the phase command count the script prints: below ~10 commands/s the
+watchdog may cut movement again — suspect rate, not motors. Robot-side scripts
+(daemon 30 Hz, explorer) don't have this problem because they talk to the local
+API.
+
+### 🎯 Steering Trim (servo) — verified 2026-07-31
+
+With angle=0 this robot drifts RIGHT ~4.4° per 1.9 m (~2°/s at real -0.65;
+measured: 14.5 cm lateral in 190.5 cm forward). Compensation: the backend adds
+`STRAIGHT_ANGLE_OFFSET` (`.env`, default 0) to every angle, and can be tuned
+**live** via `POST /api/calibration {"angle_offset": X}` (no restart; GET
+returns the active values).
+
+⚠️ **The steering is EXTREMELY sensitive near center** — measured:
+- offset `-0.11` → ~40°/s left turn (90° in 2.2 s! radius ~1.2 m)
+- offset `-0.01` → still a clear left turn
+- Linear estimate for zero drift ≈ **-0.005**, but iterate from **-0.002/-0.003**
+  (tiny values; the gain near center may be nonlinear and battery-dependent).
+
+Tuning loop: run 2 s at -0.30 normalized (real -0.65), measure lateral
+deviation, adjust via POST /api/calibration, rerun. No restarts needed.
+
+### 📏 Real Speed Measurements — verified 2026-07-31
+
+Ground truth with tape + timed bursts (watchdog decay ~0.2 s):
+
+| Throttle real | Measured speed | Notes |
+|:---:|:---:|---|
+| -0.55 (normalized -0.10) | ~0.87 m/s | "minimum moving" is NOT slow |
+| -0.65 (normalized -0.30) | ~0.83 m/s | within measurement noise of the above |
+| 0 | 0 | |
+
+Implications: the speed curve is nearly flat at the low end (or measurements
+are too coarse); max speed is probably ~1.6-2 m/s. Even the minimum moving
+throttle is walking pace — autonomous exploration must respect this (real 0.55
+≈ 0.9 m/s, not a crawl). Same test also showed the right drift above.
+
 ### 🎛️ Calibration: Throttle Dead Zone (verified 2026-07-31)
 
 This robot has a **dead zone of ~|0.5|**: raw throttles between 0 and ~0.5 do
@@ -294,7 +353,72 @@ normalized 0.1 → real 0.55 | 0.3 → 0.65 | 0.5 → 0.75 | 1 → 1
   explorer) implement the same `cal()` curve internally with normalized
   constants.
 
-### Typical Values for Movement
+Detalle completo de la sesión (datos del barrido, implementación en backend/
+daemon/explorer/controlcamara, ritmos medidos): `references/throttle-dead-zone-2026-07-31.md`.
+
+### 🎛️ Calibration: Steering Trim (STRAIGHT_ANGLE_OFFSET, 2026-07-31)
+
+This robot **drifts right** with `angle=0`: measured **14.5 cm lateral over
+190.5 cm forward ≈ 4.4° heading error** (~1.9°/s at real -0.65). The backend
+applies a steering trim before sending (`calibrateAngle` in
+`apps/backend/vehicleControl.js`):
+
+```
+angle_real = clamp(angle + STRAIGHT_ANGLE_OFFSET, -1, 1)
+```
+
+**🔴 CRITICAL — the servo is EXTREMELY sensitive, an order of magnitude more
+than intuition suggests.** Verified live: offset **-0.11 → ~40°/s yaw → a
+literal 90° turn in 2.2 s** (gain ≈ 380°/s per 1.0 of angle). A trim that
+"should" be a gentle correction can spin the robot. The linear fit from two
+measured points (0 → +2°/s right; -0.11 → -40°/s left) predicts the straight
+trim at ≈ **-0.005**, and even **-0.01 visibly over-turns left**.
+
+- **Start tiny: -0.005 to -0.01, iterate in ±0.005 steps** (NOT ±0.03). Never
+  jump to -0.1. The trim also shifts with battery, surface, tire wear.
+- `STRAIGHT_ANGLE_OFFSET` in the root `.env` is the startup default (negative
+  = corrects right drift; default 0 = no trim).
+- **Runtime tuning without restarts**: the backend exposes
+  `GET /api/calibration` (active values) and
+  `POST /api/calibration {"angle_offset": X}` (in-memory override until
+  restart). Always GET first — a backend that wasn't actually restarted still
+  runs the old offset (check `uptime_s` in `/api/health` to disambiguate).
+- Same choke point as the throttle calibration: everything through the backend
+  (frontend, agent, navigation) gets the trim. Robot-side scripts (daemon,
+  explorer) do NOT have it — add their own constant if needed.
+- The "true" fix is physical servo-center calibration in the robot's dashboard
+  (calibration_drive topic); the software trim is the immediate, reversible
+  option and the project's current approach.
+- Detalle y mediciones: `references/steering-trim-2026-07-31.md`.
+
+### 📏 Real Speeds Measured (2026-07-31, floor tape + fixed-duration burst)
+
+This robot is **fast even at its minimum moving throttle**: real -0.55 (=
+normalized -0.10) traveled **191 cm in 2.2 s ≈ 0.87 m/s**. Second point
+measured the same day: real -0.65 (= normalized -0.30) traveled **190.5 cm in
+2.31 s ≈ 0.83 m/s** — both runs sit within measurement noise (±5-10 %), so the
+throttle→speed curve looks flat in [0.55, 0.65]; do not trust single-run
+differences below ~0.1 m/s. Max speed estimated at **1.6-2 m/s** (roughly
+linear throttle→speed). No odometry/IMU exists on this robot (see hardware
+audit) — speed must be measured externally.
+
+**Safety implication:** any command that actually moves this robot moves it at
+walking pace or faster. The old "slow crawl 0.35 real" docs values sat in the
+dead zone and never moved; the minimum that moves (real ≥0.5) is already 🟡
+caution speed. Never assume "low throttle = crawl" on this hardware; account
+for ~0.9 m/s minimum motion in autonomous exploration.
+
+**Speed measurement protocol (proven):**
+1. Tape measure on the floor, clear straight zone, robot on the ground,
+   operator watching (same reference point — front bumper — at start and end).
+2. Drive a **fixed-duration burst**: fire-and-forget loop with a
+   `time.monotonic()` deadline (e.g. 2.0 s), then send stops.
+3. The watchdog stops motors ~0.2 s after the last command → travel time ≈
+   burst_duration + 0.2 s. `speed = distance / (burst_duration + 0.2)`.
+4. Two points (e.g. real -0.55 and -0.65) + 0 m/s at 0 are enough to build a
+   usable speed map for planning.
+
+### 📏 Calibración medida en vivo (2026-07-31, mismo boot)
 
 > ⚠️ Normalized values (through the backend). Raw values are shown in
 > parentheses. Values below ~0.5 raw / 0.05 normalized sit in the dead zone and
@@ -333,6 +457,11 @@ normalized 0.1 → real 0.55 | 0.3 → 0.65 | 0.5 → 0.75 | 1 → 1
 > (él mira el LED y reporta las ruedas). OJO: las etiquetas del nodo asumen
 > positivo=adelante, así que en un robot negativo=adelante el **LED naranja =
 > avance físico**. Barrido reutilizable: `scripts/drive-calibration.py`.
+> **Medido en vivo: el LED NO cambió durante el barrido aunque el nodo reportaba
+> `c1 ready`/`c2 ready`** — el anunciador LED no es fiable como señal de fase
+> (el override del webserver o la suscripción no ganan); no diseñes un test que
+> dependa de él, usa los prints del script como referencia temporal y el
+> usuario reporta lo que ve.
 
 ### Typical Values for Movement
 
@@ -345,7 +474,10 @@ normalized 0.1 → real 0.55 | 0.3 → 0.65 | 0.5 → 0.75 | 1 → 1
 | Reverse (this robot) | 0 | **+0.10 a +0.20** (real +0.55 a +0.60) | 0.7 |
 | Brake/Stop | 0 | 0.0 | 0.0 |
 
-> ⚠️ The typical values listed above use the **web API convention** (positive = forward), which is confirmed by the project's own `drive_test.py`. However, **on some robots this convention flips after a reboot** (likely due to motor calibration polarity being re-read differently). If the robot goes backward when you expect forward, **test with both +0.3 and -0.3** to determine the current convention. A quick diagnostic:
+> ⚠️ Convención verificada 2026-07-31 en este robot: **negativo = adelante,
+> positivo = atrás** (coincide con GUIA_SETUP/HANDOFF; el `drive_test.py` viejo
+> que usaba +0.7 para avanzar está obsoleto). OJO: la convención puede voltearse
+> entre reinicios — siempre probar dirección antes de asumir:
 > ```bash
 > # Send throttle=+0.3 for 1s, observe direction
 > # Then throttle=-0.3 for 1s

@@ -184,6 +184,33 @@ export async function stopVehicle() {
 // Configurable vía env THROTTLE_DEAD_ZONE (por defecto 0.5; sube con batería baja).
 const THROTTLE_DEAD_ZONE = Math.max(0, Math.min(0.95, parseFloat(process.env.THROTTLE_DEAD_ZONE || "0.5")));
 
+// ===================== CALIBRACIÓN DE DIRECCIÓN (trim del servo) =====================
+// Compensa la deriva de dirección: con angle=0 este robot gira ~4.4° a la derecha
+// por cada ~1.9 m (verificado 2026-07-31: 14.5 cm de desvío en 190.5 cm de avance).
+// STRAIGHT_ANGLE_OFFSET se SUMA al ángulo del consumidor (negativo = compensa deriva
+// a la derecha; ej. -0.11). Configurable vía env (valor inicial) y en vivo vía
+// POST /api/calibration (setCalibration). Por defecto 0 (sin trim).
+let straightAngleOffset = Math.max(-1, Math.min(1, parseFloat(process.env.STRAIGHT_ANGLE_OFFSET || "0")));
+
+export function calibrateAngle(angle) {
+  const a = Math.max(-1, Math.min(1, angle));
+  return Math.max(-1, Math.min(1, a + straightAngleOffset));
+}
+
+export function setCalibration({ angleOffset } = {}) {
+  if (typeof angleOffset === "number" && Number.isFinite(angleOffset)) {
+    straightAngleOffset = Math.max(-1, Math.min(1, angleOffset));
+  }
+  return getCalibration();
+}
+
+export function getCalibration() {
+  return {
+    straightAngleOffset,
+    throttleDeadZone: THROTTLE_DEAD_ZONE,
+  };
+}
+
 export function calibrateThrottle(throttle) {
   const sign = Math.sign(throttle);
   const mag = Math.min(Math.abs(throttle), 1);
@@ -193,7 +220,7 @@ export function calibrateThrottle(throttle) {
 }
 
 export async function manualDrive(angle, throttle, max_speed) {
-  const a = Math.max(-1, Math.min(1, angle));
+  const a = calibrateAngle(angle);
   const t = calibrateThrottle(throttle);
   const m = Math.max(0, Math.min(1, max_speed));
 
