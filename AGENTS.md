@@ -42,6 +42,32 @@ Estas reglas aplican a todo el repositorio.
   zona despejada, parada verificada y velocidad limitada.
 - Prefiere validaciones estáticas, builds, mocks, fixtures y endpoints de salud.
 
+## Commits y push (reglas obligatorias)
+
+- Todos los commits siguen **Conventional Commits 1.0.0**:
+  `<type>(<scope>): <descripción imperativa>` (≤72 chars, sin emojis, sin
+  atribuciones automáticas). Skill de referencia:
+  `hermes/skills/github/conventional-commits-deepracer/`.
+- El detalle va en el **cuerpo** del mensaje, nunca en la primera línea.
+- **NADIE hace push directo a `main`** (protección de rama activa). Todo
+  cambio entra por **pull request** con al menos 1 review y CI en verde
+  (`ci` + `secret-scan`).
+- Prohibido `--force` a `main` (y en general, prohibido reescribir historial
+  sin autorización explícita del mantenedor).
+- Hooks locales: correr `scripts/install-hooks.sh` en cada clon que trabaje
+  el robot (gitleaks pre-commit).
+- Verificar antes de pushear: `git diff --cached` sin `.env`, claves,
+  `state.db`, tokens ni certificados (`apps/simulator/certs/`).
+
+## Gobernanza
+
+- La rama `main` está protegida: PRs obligatorios, reviews, CI verde.
+- Mantenedores del semestre: autorizados para mergear los PRs.
+- Colaboradores externos: acceso SOLO como GitHub collaborators con permiso
+  de escritura — nunca claves del repositorio personal del dueño.
+- El agente del DeepRacer debe corregir formatos de commit en la revisión
+  de PRs, jamás reescribir historial por su cuenta.
+
 ## Al añadir o retirar contenido
 
 - Sigue las listas de comprobación de las secciones 12 y 13 de
