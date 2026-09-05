@@ -1,0 +1,7 @@
+# Dependencias del simulador DeepRacer.
+# El contrato de la API funciona con la stdlib (cero deps).
+# El stream MJPEG sintético necesita opencv (y numpy) — mismos paquetes
+# que ya usa apps/navigation. Si no están, el mock corre igual y el
+# stream responde 503 con un aviso claro.
+opencv-contrib-python==5.0.0.93
+numpy==2.5.1
