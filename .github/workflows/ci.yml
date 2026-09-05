@@ -22,9 +22,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Python — tests (navegación, RAG, voz)
+      - name: Python — dependencias
         run: |
           pip install pytest
+          pip install -r apps/navigation/requirements.txt
+
+      - name: Python — tests (navegación, RAG, voz)
+        run: |
           python -m pytest apps/navigation/tests apps/rag/tests \
             apps/speech-to-text/tests apps/text-to-speech/tests -q
 
