@@ -494,12 +494,22 @@ LOGIN_HTML = """<!DOCTYPE html>
 <meta name="csrf-token" content="{csrf}"></head>
 <body style="font-family:sans-serif;background:#222;color:#eee">
 <h2>AWS DeepRacer — Simulador</h2>
-<form method="POST" action="/login">
+<form id="loginForm" method="POST" action="/login">
 <input type="hidden" name="csrf_token" value="{csrf}">
 <label>Password: <input type="password" name="password"></label>
 <input type="submit" value="Login">
 </form>
 <p style="color:#888">Contraseña: {pw_hint}</p>
+<script>
+const params = new URLSearchParams(location.search);
+const next = params.get('next') || '/home';
+document.getElementById('loginForm').addEventListener('submit', async (ev) => {{
+  ev.preventDefault();
+  const resp = await fetch('/login', {{method: 'POST', body: new FormData(ev.target)}});
+  if (resp.ok) {{ location.href = next; }}
+  else {{ alert('Login falló: HTTP ' + resp.status); }}
+}});
+</script>
 </body></html>"""
 
 HOME_HTML = """<!DOCTYPE html>
@@ -609,6 +619,12 @@ class MockHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
         elif path == "/home":
+            _, authed = parse_session(self.headers.get("Cookie"))
+            if not authed:
+                self.send_response(302)
+                self.send_header("Location", "/login?next=/home")
+                self.end_headers()
+                return
             body = HOME_HTML.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
