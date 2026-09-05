@@ -47,17 +47,30 @@ implementado fue faster-whisper local (STT) + edge-tts en la nube (TTS).
 
 ### Fase V1 — Exponer STT y TTS como servicios HTTP
 - [ ] Convertir `src/server.py` de cada app en un servidor FastAPI sencillo:
-  - `POST /api/stt` — recibe audio (WAV/PCM 16 kHz mono) → devuelve `{"text": "..."}`
-  - `POST /api/tts` — recibe `{"text": "..."}` → devuelve audio PCM/WAV
+  - `POST /api/stt` — recibe audio → devuelve `{"text": "..."}`
+  - `POST /api/tts` — recibe `{"text": "..."}` → devuelve audio
+- [ ] **Contrato de audio ÚNICO y exacto** (STT y TTS, sin ambigüedad):
+      `Content-Type: audio/wav` · PCM lineal 16-bit · **16 kHz** · **mono**.
+      El contenedor, el muestreo y los canales se fijan acá y no se negocian
+      por request (decir "WAV/PCM" a secas no alcanza: una implementación
+      podría mandar 44.1 kHz stereo y romper el contrato).
 - [ ] Mantener el contrato de audio del prototipo (16 kHz mono 16-bit)
 - [ ] Config por env vars (`.env.example`): `STT_MODEL_SIZE`, `STT_DEVICE`
       (`cuda`/`cpu`), `TTS_VOZ`, puertos
 - [ ] Tests de contrato nuevos en cada app
+- [ ] **Red y autenticación**: los servicios NO escuchan en `0.0.0.0` de la
+      red de la U. Bind a la interfaz de Tailscale (o `127.0.0.1` + proxy por
+      el tailnet). Si algún día se exponen fuera del tailnet: token Bearer
+      simple por env var. (La U es red compartida: un `/api/stt` abierto sin
+      auth = cualquiera puede spamear el STT y escuchar las respuestas.)
 
 ### Fase V2 — Micrófono y parlante remotos (celular como oídos/boca)
 El robot no tiene audio físico; el camino corto es el celular:
-- [ ] **App/cliente de captura** en el celular (o en el PC de la U): captura
-      micrófono → envía tramos al `POST /api/stt` (por la red local o
+- [ ] **App/cliente de captura** en el celular (o en el PC de la U): graba el
+      micrófono, **detecta el fin de la intervención** (silencio, como el
+      prototipo, o push-to-talk) y envía UN request = UNA intervención
+      completa a `POST /api/stt`. El servidor NO concatena tramos ni mantiene
+      estado de sesión: cada request es autocontenido (por la red local o
       Tailscale, no por internet)
 - [ ] **Reproductor** en el celular/PC: recibe el audio de TTS y lo reproduce
       (también se puede usar como *speaker* del robot mientras no haya uno
@@ -84,6 +97,11 @@ El robot no tiene audio físico; el camino corto es el celular:
 
 ### Fase V5 — Privacidad y cierre
 - [ ] Política: no guardar audio; transcripciones solo en memoria de sesión
+- [ ] **No loguear transcripciones** (CWE-532): el `print()` actual del
+      prototipo fue debug legítimo de la etapa de pruebas de audio SIN robot
+      (Juan lo usaba para verificar que el pipeline funcionaba). Al exponer
+      HTTP, la transcripción NO va a stdout/logs por defecto; si se necesita
+      debug, flag explícito `LOG_TRANSCRIPTIONS=false` (default apagado)
 - [ ] Actualizar `apps/README.md` con los puertos nuevos
 - [ ] Actualizar la sección "Voz" del plan maestro cuando V1-V3 estén
 
