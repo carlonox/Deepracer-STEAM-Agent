@@ -1,3 +1,7 @@
+# Planes
+
+Tareas pendientes, próximas actividades y visión del proyecto.
+
 | Documento | Contenido |
 |---|---|
 | `vision-nuevo-proyecto.md` | Visión y alcance de la mascota robótica. |
