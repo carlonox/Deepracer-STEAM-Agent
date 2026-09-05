@@ -49,8 +49,9 @@ implementado fue faster-whisper local (STT) + edge-tts en la nube (TTS).
 - [ ] Convertir `src/server.py` de cada app en un servidor FastAPI sencillo:
   - `POST /api/stt` — recibe audio → devuelve `{"text": "..."}`
   - `POST /api/tts` — recibe `{"text": "..."}` → devuelve audio
-- [ ] **Contrato de audio ÚNICO y exacto** (STT y TTS, sin ambigüedad):
-      `Content-Type: audio/wav` · PCM lineal 16-bit · **16 kHz** · **mono**.
+- [ ] **Contrato de audio ÚNICO y exacto, por dirección** (sin ambigüedad):
+      - Request a `POST /api/stt`: `Content-Type: audio/wav` (PCM 16-bit, 16 kHz, mono)
+      - Response de `POST /api/tts`: `Content-Type: audio/wav` (PCM 16-bit, 16 kHz, mono)
       El contenedor, el muestreo y los canales se fijan acá y no se negocian
       por request (decir "WAV/PCM" a secas no alcanza: una implementación
       podría mandar 44.1 kHz stereo y romper el contrato).
@@ -58,11 +59,15 @@ implementado fue faster-whisper local (STT) + edge-tts en la nube (TTS).
 - [ ] Config por env vars (`.env.example`): `STT_MODEL_SIZE`, `STT_DEVICE`
       (`cuda`/`cpu`), `TTS_VOZ`, puertos
 - [ ] Tests de contrato nuevos en cada app
-- [ ] **Red y autenticación**: los servicios NO escuchan en `0.0.0.0` de la
-      red de la U. Bind a la interfaz de Tailscale (o `127.0.0.1` + proxy por
-      el tailnet). Si algún día se exponen fuera del tailnet: token Bearer
-      simple por env var. (La U es red compartida: un `/api/stt` abierto sin
-      auth = cualquiera puede spamear el STT y escuchar las respuestas.)
+- [ ] **Red y autenticación (obligatoria, no opcional)**:
+      - Los servicios NO escuchan en `0.0.0.0` de la red de la U: bind a la
+        interfaz de Tailscale (o `127.0.0.1` + proxy por el tailnet).
+      - **Token Bearer SIEMPRE**: cada request a `/api/stt` y `/api/tts`
+        lleva `Authorization: Bearer <token>` (env var `VOICE_API_TOKEN`).
+        El token es obligatorio aunque el servicio solo sea alcanzable por
+        Tailscale (defensa en profundidad).
+      - (La U es red compartida: un `/api/stt` abierto sin auth = cualquiera
+        puede spamear el STT y escuchar las respuestas; CWE-306.)
 
 ### Fase V2 — Micrófono y parlante remotos (celular como oídos/boca)
 El robot no tiene audio físico; el camino corto es el celular:
@@ -70,8 +75,8 @@ El robot no tiene audio físico; el camino corto es el celular:
       micrófono, **detecta el fin de la intervención** (silencio, como el
       prototipo, o push-to-talk) y envía UN request = UNA intervención
       completa a `POST /api/stt`. El servidor NO concatena tramos ni mantiene
-      estado de sesión: cada request es autocontenido (por la red local o
-      Tailscale, no por internet)
+      estado de sesión: cada request es autocontenido. **Solo por Tailscale**
+      (consistente con V1: nada de red local directa)
 - [ ] **Reproductor** en el celular/PC: recibe el audio de TTS y lo reproduce
       (también se puede usar como *speaker* del robot mientras no haya uno
       USB conectado)
@@ -96,12 +101,17 @@ El robot no tiene audio físico; el camino corto es el celular:
       `SILENCE_DURATION_SEC`) con audio real del aula, no ideal
 
 ### Fase V5 — Privacidad y cierre
-- [ ] Política: no guardar audio; transcripciones solo en memoria de sesión
-- [ ] **No loguear transcripciones** (CWE-532): el `print()` actual del
-      prototipo fue debug legítimo de la etapa de pruebas de audio SIN robot
-      (Juan lo usaba para verificar que el pipeline funcionaba). Al exponer
-      HTTP, la transcripción NO va a stdout/logs por defecto; si se necesita
-      debug, flag explícito `LOG_TRANSCRIPTIONS=false` (default apagado)
+- [ ] Política: no guardar audio. Las transcripciones viven en la **memoria
+      de sesión del AGENTE (Hermes)**, no en el servicio HTTP: el STT devuelve
+      texto al agente, el agente lo procesa y lo descarta al cerrar la
+      conversación. Los endpoints son stateless (consistente con V2)
+- [ ] **El servicio HTTP NUNCA loguea transcripciones** (CWE-532): el
+      `print()` del prototipo fue debug legítimo de la etapa de pruebas de
+      audio SIN robot (Juan lo usaba para verificar el pipeline). Esa salida
+      vive solo en el script de pruebas local — **los endpoints `/api/stt` y
+      `/api/tts` no escriben el texto transcrito en stdout ni en logs,
+      bajo ninguna bandera**. La única excepción: modo debug explícito en
+      desarrollo local, nunca en la ruta HTTP
 - [ ] Actualizar `apps/README.md` con los puertos nuevos
 - [ ] Actualizar la sección "Voz" del plan maestro cuando V1-V3 estén
 
