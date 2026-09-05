@@ -559,7 +559,7 @@ document.getElementById('cmd_hz').textContent=s.cmd_hz+' Hz';
 document.getElementById('pose').textContent=`x=${s.x} y=${s.y} heading=${s.heading_deg}°`;
 document.getElementById('speed').textContent=s.speed_ms+' m/s';
 document.getElementById('led').textContent=JSON.stringify(s.led);
-}})},300);
+})},300);
 </script>
 </body></html>"""
 
@@ -627,6 +627,9 @@ class MockHandler(BaseHTTPRequestHandler):
         elif path == "/":
             self.send_response(302)
             self.send_header("Location", "/login")
+            self.end_headers()
+        elif path == "/favicon.ico":
+            self.send_response(204)
             self.end_headers()
         else:
             send_json(self, {"success": False, "error": f"not found: {path}"}, 404)
