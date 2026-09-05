@@ -491,6 +491,7 @@ def camera_loop():
 BOUNDARY = "boundarydonotcross"
 LOGIN_HTML = """<!DOCTYPE html>
 <html><head><title>AWS DeepRacer (simulado)</title>
+<meta charset="utf-8">
 <meta name="csrf-token" content="{csrf}"></head>
 <body style="font-family:sans-serif;background:#222;color:#eee">
 <h2>AWS DeepRacer — Simulador</h2>
@@ -505,7 +506,7 @@ const params = new URLSearchParams(location.search);
 const next = params.get('next') || '/home';
 document.getElementById('loginForm').addEventListener('submit', async (ev) => {{
   ev.preventDefault();
-  const resp = await fetch('/login', {{method: 'POST', body: new FormData(ev.target)}});
+  const resp = await fetch('/login', {{method: 'POST', body: new URLSearchParams(new FormData(ev.target))}});
   if (resp.ok) {{ location.href = next; }}
   else {{ alert('Login falló: HTTP ' + resp.status); }}
 }});
@@ -513,7 +514,8 @@ document.getElementById('loginForm').addEventListener('submit', async (ev) => {{
 </body></html>"""
 
 HOME_HTML = """<!DOCTYPE html>
-<html><head><title>DeepRacer Simulador — Control</title>
+<html><head><meta charset="utf-8">
+<title>DeepRacer Simulador — Control</title>
 <style>
 body{font-family:sans-serif;background:#111;color:#ddd;margin:20px}
 table{border-collapse:collapse} td{padding:4px 10px}
@@ -613,7 +615,7 @@ class MockHandler(BaseHTTPRequestHandler):
             cookie = make_session_cookie(csrf, False)
             body = LOGIN_HTML.format(csrf=csrf, pw_hint=API_PASSWORD).encode()
             self.send_response(200)
-            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Set-Cookie", f"session={cookie}; Path=/; HttpOnly")
             self.end_headers()
@@ -627,7 +629,7 @@ class MockHandler(BaseHTTPRequestHandler):
                 return
             body = HOME_HTML.encode()
             self.send_response(200)
-            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
