@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  validate:
+    name: Validación estática y tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Backend (Node) — sintaxis
+        run: |
+          node --check apps/backend/server.js
+          node --check apps/backend/vehicleControl.js
+
+      - name: Python — setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python — tests (navegación, RAG, voz)
+        run: |
+          pip install pytest
+          python -m pytest apps/navigation/tests apps/rag/tests \
+            apps/speech-to-text/tests apps/text-to-speech/tests -q
+
+      - name: Frontend — build y lint
+        working-directory: apps/frontend
+        run: |
+          npm ci
+          node ./node_modules/vite/bin/vite.js build
+          node ./node_modules/eslint/bin/eslint.js .
