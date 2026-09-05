@@ -103,6 +103,38 @@ Opciones:
 La opción 1 es suficiente para invalidar los secretos anteriores. La opción 2
 reduce su exposición documental, pero es disruptiva y requiere coordinación.
 
+### Purga ejecutada (2026-09-05)
+
+Se reescribió el historial completo con `git filter-repo --replace-text`
+(el repositorio quedó con remotos eliminados: volver a agregar con
+`git remote add origin https://github.com/carlonox/Deepracer-STEAM-Agent.git`
+después de un clon fresco). Secretos reemplazados por `***REMOVED***` en TODOS
+los commits:
+
+- `HERMES_DASHBOARD_BASIC_AUTH_SECRET` (64 hex) que estaba en
+  `Documentacion.md` (solo existía en historial, archivo ya retirado de HEAD).
+- Contenido de `docs/archive/.../aws/password.txt`: hash de la contraseña de la
+  API web del DeepRacer.
+- Contenido de `docs/archive/.../aws/token.txt`: device token UUID del
+  DeepRacer.
+
+Verificación posterior: `gitleaks detect` sobre el historial completo = 0 leaks.
+
+**Acciones pendientes (asumir comprometidos hasta rotar):**
+
+- [ ] Dashboard de Hermes: verificar si el `HERMES_DASHBOARD_BASIC_AUTH_SECRET`
+      purgado sigue en uso en `.env` local; si es el mismo valor, rotarlo (el
+      doc indica que ya se rotó localmente, confirmar).
+- [ ] DeepRacer: al recuperar acceso al robot, rotar la contraseña de la API web
+      (procedimiento oficial de reset, ver skill `deepracer-control`) y
+      regenerar el device token si es posible; luego actualizar `.env`.
+- [ ] Resincronizar clones existentes (PC de universidad, otros): los commit
+      SHAs cambiaron; hacer `git fetch` + `git reset --hard origin/main`
+      (o re-clonar). NO seguir trabajando sobre el historial viejo.
+
+> ⚠️ Los valores purgados pueden seguir vivos en clones locales viejos, bundles,
+> forks o capturas. Por eso la rotación pendiente NO debe saltarse.
+
 ## Comprobación previa al push
 
 - [ ] `.env` está ignorado por Git.
