@@ -3,8 +3,13 @@
 > **Audiencia:** el agente Hermes del DeepRacer (SpeedRacer) y las personas que
 > mantengan este repositorio.
 >
-> **Fecha de creación:** 2026-09-05 · **Estado:** pendiente de ejecución
+> **Fecha de creación:** 2026-09-05 (actualizado: gobernanza + upgrade Hermes)
+> **Estado:** pendiente de ejecución
 > (el robot no está disponible; el PC con el entorno real está en la U).
+>
+> **2026-09-05 — historial normalizado:** 19 commits reescritos con
+> Conventional Commits (type+scope+imperativo). El repo ahora tiene
+> protección de rama (ver Fase 8) y una skill de commits propia.
 >
 > **Regla principal:** ninguna mejora justifica romper una ruta, perder datos,
 > divulgar secretos o **activar el vehículo sin autorización**. Todo cambio de
@@ -36,6 +41,9 @@ físico del aula**. Su memoria debe ser ligera y curada, no un archivo infinito.
 | **Docs** | `docs/archive/SpeedRacerv.2/` (iteración anterior) se **conserva tal cual** — decisión explícita de Carlos. No mover, no borrar. |
 | **ESP32** | ❌ **Descartado por Carlos**: el sensor de sonido solo detectaba choques y no aportaba. No invertir más tiempo ahí. |
 | **Pendientes de seguridad** | Rotar password API web del robot y regenerar device token cuando haya acceso (ver `CREDENTIAL_ROTATION.md`). Los valores viejos están en BWS como `DEEPRACER_LEGACY_*`. |
+| **Commits** | ✅ Historial normalizado a Conventional Commits (19 commits, type+scope+imperativo). Skill propia: `hermes/skills/github/conventional-commits-deepracer/`. |
+| **Gobernanza** | ✅ Protección de rama `main` (PRs obligatorios + CI verde + sin push directo). Ver Fase 8. |
+| **Actualizar Hermes** | ⏳ El agente corre v0.18 (los docs mencionan `config_version: 33`); planificar upgrade a la última versión estable (Fase 1.5). |
 
 ---
 
@@ -101,6 +109,29 @@ python apps/simulator/deepracer_mock.py           # HTTPS :5001 + HTTP :8080
       movimiento al inicio: login, health, cámara)
 - [ ] Prueba de dirección controlada (throttle ±0.3, 1s, zona despejada,
       operador presente) → registrar convención actual del boot en la memoria
+
+### Fase 1.5 — Actualizar Hermes del agente a la última versión estable
+
+El agente del DeepRacer corre Hermes v0.18 (los docs del repo mencionan
+`hermes-v18-bugs.md` y `config_version: 33`). Hermes avanza rápido; conviene
+actualizar ANTES de seguir con SOUL/memoria para no construir sobre una base
+vieja.
+
+- [ ] Verificar la versión actual: `hermes --version` dentro del entorno real
+- [ ] Leer la documentación de migración de Hermes (https://hermes-agent.nousresearch.com/docs)
+      para el salto v0.18 → última estable (probablemente v0.20+)
+- [ ] **Backup completo antes de actualizar**: `hermes/` (config, skills,
+      memories, state), el `.env`, y las claves — nada se pierde
+- [ ] Subir versión de la imagen en `Dockerfile.hermes` / `docker-compose.template.yml`
+- [ ] Probar el upgrade contra el **simulador primero** (Fase 0): login,
+      dashboard, control — antes de tocar el robot
+- [ ] Documentar cambios de config necesarios (vars renombradas, plugins,
+      `config_version`) en `docs/development/`
+- [ ] Verificar que la skill `deepracer-control` y las nuevas skills
+      sobreviven al upgrade (formato SKILL.md estable, pero confirmar)
+
+> Si el upgrade rompe algo, el bundle de respaldo permite volver atrás.
+> No actualizar el robot real hasta que el stack completo pase la Fase 0.
 
 ### Fase 2 — Actualizar el SOUL del agente (`hermes/soul/soul.md`)
 
@@ -184,6 +215,31 @@ skills `motor-control`, `sensor-reader`, `live-calibration`):
 - [ ] Conservar el conocimiento verificado intacto (las mediciones de
       2026-07-31 son oro; mover, no reescribir)
 
+### Fase 8 — Gobernanza del repo (varias personas operan este proyecto)
+
+El proyecto lo maneja más de una persona (semestre a semestre cambia quién
+opera el robot). Para que nadie "mande todo al carajo" con un push:
+
+- [ ] **Protección de rama `main` en GitHub** (Settings → Branches):
+      - Require pull request reviews (mínimo 1)
+      - Require status checks (los workflows `ci` y `secret-scan` existentes)
+      - Require branches up to date
+      - **Bloquear push directo a `main`** — todo entra por PR
+- [ ] Actualizar `AGENTS.md` con: Conventional Commits obligatorio +
+      PR obligatorio + nunca force-push a main
+- [ ] Hooks locales: `scripts/install-hooks.sh` (gitleaks pre-commit) en
+      cualquier clon que trabaje el robot
+- [ ] Definir quién puede mergear (los mantenedores del semestre) y
+      documentarlo en `AGENTS.md`
+- [ ] Si alguien externo necesitó acceso, otorgar **solo** vía GitHub
+      collabs con permiso de escritura, nunca claves del repo de Carlos
+- [ ] Auditoría periódica: quién pusheó qué (git log + GitHub activity)
+
+> La protección de rama es el candado principal: un push directo a `main`
+> queda rechazado por GitHub aunque el que lo intente tenga permisos de
+> escritura. El CI verde es el segundo candado: nada rompe `main` sin que
+> los tests pasen.
+
 ### Fase 7 — Higiene y mantenimiento continuo
 
 - [ ] Limpiar `hermes/scripts/` de scripts de debug one-off
@@ -229,6 +285,7 @@ skills `motor-control`, `sensor-reader`, `live-calibration`):
 | `hermes/skills/.../deepracer-control/` | Conocimiento verificado del robot |
 | `CREDENTIAL_ROTATION.md` | Qué rotar y cómo al recuperar acceso |
 | Repo **Thalor** (`github.com/carlonox/Thalor`) | Patrones: `examples/robot-assistant`, doc-auditor, backup |
+| `hermes/skills/github/conventional-commits-deepracer/` | Skill de commits obligatoria para este repo |
 | `docs/plans/vision-nuevo-proyecto.md` | Visión original del proyecto 2026 |
 
 ---
@@ -237,8 +294,9 @@ skills `motor-control`, `sensor-reader`, `live-calibration`):
 
 ```
 Fase 0 (verificar mock) → Fase 1 (entorno real + rotar credenciales)
-→ Fase 2 (SOUL) → Fase 3 (memoria) → Fase 4 (RAG) → Fase 5 (cámara)
-→ Fase 6 (skills) → Fase 7 (higiene)
+→ Fase 1.5 (upgrade Hermes) → Fase 2 (SOUL) → Fase 3 (memoria)
+→ Fase 4 (RAG) → Fase 5 (cámara) → Fase 6 (skills) → Fase 7 (higiene)
+→ **Fase 8 (gobernanza — activa YA si el repo aún no tiene protección)**
 ```
 
 Cada fase termina con sus checks marcados y, si toca comportamiento físico,
