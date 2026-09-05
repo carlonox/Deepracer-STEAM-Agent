@@ -366,6 +366,11 @@ table{{border-collapse:collapse}} td{{padding:4px 10px}}
 <body>
 <h2>🚗 DeepRacer Simulador — Estado y control</h2>
 <div id="cmd"></div>
+<div style="margin:10px 0">
+<img id="cam" src="/route?topic=/camera_pkg/display_mjpeg&width=480&height=360"
+     style="border:2px solid #444;border-radius:6px;max-width:640px;width:100%"
+     alt="Cámara simulada — el robotcito gris sobre el piso">
+</div>
 <table>
 <tr><td>drive_mode</td><td id="drive_mode">-</td></tr>
 <tr><td>start_stop</td><td id="start_stop">-</td></tr>
