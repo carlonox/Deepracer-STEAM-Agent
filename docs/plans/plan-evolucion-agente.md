@@ -284,6 +284,8 @@ opera el robot). Para que nadie "mande todo al carajo" con un push:
 | `docs/operations/HANDOFF.md` | Acceso, movimiento, descubrimientos |
 | `hermes/skills/.../deepracer-control/` | Conocimiento verificado del robot |
 | `CREDENTIAL_ROTATION.md` | Qué rotar y cómo al recuperar acceso |
+| `docs/plans/plan-seguridad-secretos.md` | Secretos del equipo con BWS (a ejecutar con acceso) |
+| `docs/plans/plan-hardening-firewall.md` | Hardening de red/firewall del robot (a ejecutar con acceso) |
 | Repo **Thalor** (`github.com/carlonox/Thalor`) | Patrones: `examples/robot-assistant`, doc-auditor, backup |
 | `hermes/skills/github/conventional-commits-deepracer/` | Skill de commits obligatoria para este repo |
 | `docs/plans/vision-nuevo-proyecto.md` | Visión original del proyecto 2026 |
