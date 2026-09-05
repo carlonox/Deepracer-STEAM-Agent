@@ -59,6 +59,10 @@ implementado fue faster-whisper local (STT) + edge-tts en la nube (TTS).
 - [ ] Config por env vars (`.env.example`): `STT_MODEL_SIZE`, `STT_DEVICE`
       (`cuda`/`cpu`), `TTS_VOZ`, puertos
 - [ ] Tests de contrato nuevos en cada app
+- [ ] **Límites de carga (al implementar V1, no antes)**: definir bytes máximos
+      por request, duración máxima de audio, largo máximo de texto TTS,
+      timeouts y rate limit, con respuestas 413/408/429 — se especifican junto
+      al servidor FastAPI, no en este plan
 - [ ] **Red y autenticación (obligatoria, no opcional)**:
       - Los servicios NO escuchan en `0.0.0.0` de la red de la U: bind a la
         interfaz de Tailscale (o `127.0.0.1` + proxy por el tailnet).
@@ -76,7 +80,11 @@ El robot no tiene audio físico; el camino corto es el celular:
       prototipo, o push-to-talk) y envía UN request = UNA intervención
       completa a `POST /api/stt`. El servidor NO concatena tramos ni mantiene
       estado de sesión: cada request es autocontenido. **Solo por Tailscale**
-      (consistente con V1: nada de red local directa)
+      (consistente con V1: nada de red local directa).
+      **La conversión a WAV PCM 16-bit/16 kHz/mono la hace el CLIENTE** antes
+      de enviar (el servidor rechaza cualquier otro formato con 415) — así el
+      STT no adivina formatos; el smoke test del cliente valida el formato
+      exacto que produce
 - [ ] **Reproductor** en el celular/PC: recibe el audio de TTS y lo reproduce
       (también se puede usar como *speaker* del robot mientras no haya uno
       USB conectado)
