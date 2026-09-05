@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit hook: gitleaks sobre el working tree (no historial — eso lo cubre CI).
+# Instalación: scripts/install-hooks.sh
+
+if [ -x /opt/data/bin/gitleaks ]; then
+  HOME=/tmp/git-home GIT_CONFIG_GLOBAL=/dev/null \
+    /opt/data/bin/gitleaks protect --source . --no-banner --staged 2>/dev/null
+  if [ $? -eq 1 ]; then
+    echo "❌ gitleaks: secretos detectados en el commit. Bloqueado."
+    exit 1
+  fi
+fi
+exit 0
