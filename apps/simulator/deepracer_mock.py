@@ -667,7 +667,7 @@ def main():
     print(f"   MJPEG HTTP  : http://127.0.0.1:{HTTP_PORT}/stream_viewer?topic=/camera_pkg/display_mjpeg")
     print(f"   Estado      : https://127.0.0.1:{HTTPS_PORT}/mock/state")
     print(f"   Watchdog    : {WATCHDOG_MS} ms | dead zone: {DEAD_ZONE} | sign: {THROTTLE_SIGN} (neg=adelante)")
-    print(f"   opencv/cv2  : {'OK — frames sintéticos' if HAVE_CV else 'NO — sin stream, instala opencv'}")
+    print(f"   opencv/cv2  : {'OK — frames sintéticos con HUD' if HAVE_CV else 'NO — stream placeholder (instala opencv para HUD)'}")
     print("   Ctrl+C para salir.")
     try:
         threading.Thread(target=https_server.serve_forever, daemon=True).start()
