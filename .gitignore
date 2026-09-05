@@ -63,7 +63,8 @@ hermes/skills/creative/
 hermes/skills/data-science/
 hermes/skills/dogfood/
 hermes/skills/email/
-hermes/skills/github/
+hermes/skills/github/*
+!hermes/skills/github/conventional-commits-deepracer/
 hermes/skills/media/
 hermes/skills/mlops/
 hermes/skills/note-taking/
