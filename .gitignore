@@ -143,3 +143,6 @@ __pycache__/
 htmlcov/
 hermes/skills/.curator_backups/
 *.tgz
+
+# === SIMULADOR ===
+apps/simulator/certs/
