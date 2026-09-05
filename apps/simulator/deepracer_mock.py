@@ -29,9 +29,11 @@ Lo que emula (fidelidad al hardware real):
   "cambia entre reboots" del hardware.
 - Batería: decae con el uso; la dead zone efectiva crece con batería baja
   (como se observó en el robot).
-- Streams MJPEG: GET /route?topic=... en HTTPS :5001 (lo que usa el
-  backend) y stream_viewer/snapshot en HTTP :8080 (web_video_server).
-- Login y dashboard HTML básico en HTTPS :5001 (login + home).
+- Streams: GET /route?topic=... en HTTPS :5001 (lo que usa el backend),
+  stream_viewer/snapshot en HTTP :8080 (web_video_server). Los frames se
+  generan con OpenCV si está disponible; si no, con un generador PNG puro
+  de la stdlib (cero dependencias).
+- Login y dashboard HTML en HTTPS :5001 (login + home con cámara integrada).
 
 Lo que NO emula (documentado en README.md):
 - ROS2, nginx, SSH, ESP32/UDP, LiDAR, IMU (no existe en el hardware).
@@ -53,11 +55,13 @@ import os
 import re
 import secrets
 import ssl
+import struct
 import subprocess
 import sys
 import threading
 import time
 import urllib.parse
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # --------------------------------------------------------------------------
@@ -139,7 +143,6 @@ class SimState:
         dz = self.effective_dead_zone()
         if t < dz or not self.motors_on:
             return 0.0
-        # Curva lineal entre punto mínimo medido y máx estimado.
         if t <= MIN_MOVING_THROTTLE:
             v = MIN_SPEED_MS * (t / MIN_MOVING_THROTTLE)
         else:
@@ -250,13 +253,10 @@ def physics_loop():
             v = STATE.compute_speed()
             STATE.speed_ms = v
             if v != 0.0:
-                direction = 1.0 if STATE.throttle * THROTTLE_SIGN < 0 else -1.0
-                # THROTTLE_SIGN=-1 -> throttle negativo adelante -> direction=1
                 if THROTTLE_SIGN == -1:
                     direction = 1.0 if STATE.throttle < 0 else -1.0
                 else:
                     direction = 1.0 if STATE.throttle > 0 else -1.0
-                # giro: angle + trim (compensa deriva derecha con offset negativo)
                 effective_angle = STATE.angle + ANGLE_OFFSET
                 yaw_rate = math.radians(effective_angle * SERVO_GAIN_DEG_PER_S)
                 dt = tick
@@ -270,7 +270,7 @@ def physics_loop():
                     STATE.reset_reason = "battery"
 
 # --------------------------------------------------------------------------
-# MJPEG sintético
+# Generación de frames: OpenCV si está, PNG puro de la stdlib si no.
 # --------------------------------------------------------------------------
 try:
     import cv2
@@ -279,67 +279,214 @@ try:
 except ImportError:
     HAVE_CV = False
 
-CURRENT_JPEG = None
-JPEG_LOCK = threading.Lock()
+CURRENT_FRAME = None          # bytes del último frame (JPEG con cv2, PNG sin cv2)
+CURRENT_MIME = "image/jpeg"
+FRAME_LOCK = threading.Lock()
 
 
-def _make_frame_jpeg():
-    """Genera un frame 480x360 del mundo simulado (piso + robot + HUD)."""
-    if not HAVE_CV:
-        return None
+# --- pequeño renderer PNG sin dependencias (solo stdlib) ---
+_GLYPHS = {
+    '0': ("###", "#.#", "#.#", "#.#", "###"),
+    '1': ("..#", "..#", "..#", "..#", "..#"),
+    '2': ("###", "..#", "###", "#..", "###"),
+    '3': ("###", "..#", "###", "..#", "###"),
+    '4': ("#.#", "#.#", "###", "..#", "..#"),
+    '5': ("###", "#..", "###", "..#", "###"),
+    '6': ("###", "#..", "###", "#.#", "###"),
+    '7': ("###", "..#", "..#", "..#", "..#"),
+    '8': ("###", "#.#", "###", "#.#", "###"),
+    '9': ("###", "#.#", "###", "..#", "###"),
+    'A': ("###", "#.#", "###", "#.#", "#.#"),
+    'B': ("##.", "#.#", "##.", "#.#", "##."),
+    'C': ("###", "#..", "#..", "#..", "###"),
+    'D': ("##.", "#.#", "#.#", "#.#", "##."),
+    'F': ("###", "#..", "##.", "#..", "#.."),
+    'H': ("#.#", "#.#", "###", "#.#", "#.#"),
+    'I': ("###", "..#", "..#", "..#", "###"),
+    'L': ("#..", "#..", "#..", "#..", "###"),
+    'M': ("#.#", "###", "###", "#.#", "#.#"),
+    'N': ("#.#", "##.", "#.#", "#.#", "#.#"),
+    'O': ("###", "#.#", "#.#", "#.#", "###"),
+    'P': ("###", "#.#", "###", "#..", "#.."),
+    'R': ("###", "#.#", "##.", "#.#", "#.#"),
+    'S': ("###", "#..", "###", "..#", "###"),
+    'T': ("###", "..#", "..#", "..#", "..#"),
+    'U': ("#.#", "#.#", "#.#", "#.#", "###"),
+    'X': ("#.#", "#.#", "###", "#.#", "#.#"),
+    'Y': ("#.#", "#.#", "###", "..#", "..#"),
+    ' ': ("...", "...", "...", "...", "..."),
+    '.': ("...", "...", "...", "...", "..#"),
+    '-': ("...", "...", "###", "...", "..."),
+    '=': ("...", "###", "...", "###", "..."),
+    '%': ("#.#", "..#", ".#.", "#..", "#.#"),
+    '/': ("..#", "..#", ".#.", "#..", "#.."),
+}
+
+
+def _png_encode(w, h, rgb):
+    """Codifica RGB (bytearray w*h*3) a PNG (filtro 0, color type 2)."""
+    stride = w * 3
+    raw = bytearray()
+    for y in range(h):
+        raw.append(0)  # filter type 0
+        raw += rgb[y * stride:(y + 1) * stride]
+
+    def chunk(tag, data):
+        c = struct.pack(">I", len(data)) + tag + data
+        c += struct.pack(">I", zlib.crc32(tag + data) & 0xffffffff)
+        return c
+
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", ihdr)
+            + chunk(b"IDAT", zlib.compress(bytes(raw), 6))
+            + chunk(b"IEND", b""))
+
+
+def _make_frame_png():
+    """Frame PNG puro (sin opencv): piso gris, cuadrícula, robot orientado, HUD."""
     w, h = 480, 360
-    img = np.full((h, w, 3), (120, 120, 120), dtype=np.uint8)  # piso gris
+    rgb = bytearray(b"\x78\x78\x78") * (w * h)  # piso gris
+
+    def px(x, y, color):
+        if 0 <= x < w and 0 <= y < h:
+            i = (y * w + x) * 3
+            rgb[i] = color[0]; rgb[i + 1] = color[1]; rgb[i + 2] = color[2]
+
+    def rect(x0, y0, x1, y1, color):
+        for y in range(max(0, y0), min(h, y1)):
+            for x in range(max(0, x0), min(w, x1)):
+                px(x, y, color)
+
+    def line(x0, y0, x1, y1, color):
+        dx, dy = abs(x1 - x0), abs(y1 - y0)
+        sx = 1 if x0 < x1 else -1
+        sy = 1 if y0 < y1 else -1
+        err = dx - dy
+        while True:
+            px(x0, y0, color)
+            if x0 == x1 and y0 == y1:
+                break
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy; x0 += sx
+            if e2 < dx:
+                err += dx; y0 += sy
+
+    def poly(points, color):
+        xs = [p[0] for p in points]; ys = [p[1] for p in points]
+        x0, x1 = max(0, int(min(xs))), min(w, int(max(xs)))
+        y0, y1 = max(0, int(min(ys))), min(h, int(max(ys)))
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                inside = False
+                j = len(points) - 1
+                for i in range(len(points)):
+                    xi, yi = points[i]; xj, yj = points[j]
+                    if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi + 1e-9) + xi:
+                        inside = not inside
+                    j = i
+                if inside:
+                    px(x, y, color)
+
+    def text(txt, x0, y0, color, scale=2):
+        cx = x0
+        for ch in txt.upper():
+            glyph = _GLYPHS.get(ch, _GLYPHS[' '])
+            for gy in range(5):
+                for gx in range(3):
+                    if glyph[gy][gx] == '#':
+                        rect(cx + gx * scale, y0 + gy * scale,
+                             cx + (gx + 1) * scale, y0 + (gy + 1) * scale, color)
+            cx += 4 * scale
+
     # cuadrícula del piso
     for x in range(0, w, 40):
-        cv2.line(img, (x, 0), (x, h), (100, 100, 100), 1)
+        for y in range(h):
+            px(x, y, (0x66, 0x66, 0x66))
     for y in range(0, h, 40):
-        cv2.line(img, (0, y), (w, y), (100, 100, 100), 1)
-    # mundo: 10x10 m -> 480x360 px (escala 48 px/m, 36 px/m)
+        for x in range(w):
+            px(x, y, (0x66, 0x66, 0x66))
+
     with STATE.lock:
-        px = int(240 + STATE.x * 48)
-        py = int(180 + STATE.y * 36 * -1)  # y invertida (arriba = +y)
-        heading = STATE.heading
-        motors = STATE.motors_on
+        sx = STATE.x; sy = STATE.y; heading = STATE.heading
+        motors = STATE.motors_on; batt = STATE.battery
+        speed = STATE.speed_ms; angle = STATE.angle
         start = STATE.start_stop
-        batt = STATE.battery
-        speed = STATE.speed_ms
-        angle = STATE.angle
-    # eje de referencia (heading 0 = +x)
+
+    pxc = int(240 + sx * 40)
+    pyc = int(180 - sy * 40)  # y invertida (arriba = +y)
     ex, ey = math.cos(heading), math.sin(heading)
     nx, ny = -ey, ex
+    hl, hw = 14.0, 8.0
     corners = [
-        (px + 12 * ex + 8 * nx, py + 12 * ey + 8 * ny),
-        (px + 12 * ex - 8 * nx, py + 12 * ey - 8 * ny),
-        (px - 12 * ex - 8 * nx, py - 12 * ey - 8 * ny),
-        (px - 12 * ex + 8 * nx, py - 12 * ey + 8 * ny),
+        (pxc + hl * ex + hw * nx, pyc + hl * ey + hw * ny),
+        (pxc + hl * ex - hw * nx, pyc + hl * ey - hw * ny),
+        (pxc - hl * ex - hw * nx, pyc - hl * ey - hw * ny),
+        (pxc - hl * ex + hw * nx, pyc - hl * ey + hw * ny),
     ]
     color = (0, 200, 0) if motors else (200, 0, 0)
-    cv2.fillConvexPoly(img, np.array(corners, dtype=np.int32), color)
-    # marca de dirección (punta)
-    tip = (int(px + 18 * ex), int(py + 18 * ey))
-    cv2.circle(img, tip, 3, (255, 255, 0), -1)
-    # HUD
-    cv2.putText(img, f"SIMULADOR - x={STATE.x:.1f} y={STATE.y:.1f} h={math.degrees(heading)%360:.0f}",
-                (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    cv2.putText(img, f"motors={'ON' if motors else 'OFF'} start={start} batt={batt:.0f}%",
-                (8, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    cv2.putText(img, f"angle={angle:+.2f} speed={speed:.2f} m/s",
-                (8, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 70])
-    return buf.tobytes() if ok else None
+    poly(corners, color)
+    line(int(pxc), int(pyc), int(pxc + 20 * ex), int(pyc + 20 * ey), (255, 255, 0))
+    px(pxc, pyc, (255, 255, 255))
+
+    text("SIMULADOR", 10, 8, (255, 255, 255))
+    text(f"x={sx:.1f} y={sy:.1f} h={math.degrees(heading) % 360:.0f}", 10, 28, (255, 255, 255))
+    text(f"MOT={'ON' if motors else 'OFF'} START={start}", 10, 48,
+         (0, 255, 0) if motors else (255, 80, 80))
+    text(f"BATT={batt:.0f}% SPD={speed:.2f} ANG={angle:+.2f}", 10, 68, (255, 255, 255))
+    return _png_encode(w, h, rgb)
+
+
+def _make_frame():
+    """Devuelve (bytes, mime) del último frame. JPEG con cv2, PNG puro sin cv2."""
+    if HAVE_CV:
+        img = np.full((360, 480, 3), (120, 120, 120), dtype=np.uint8)
+        for x in range(0, 480, 40):
+            cv2.line(img, (x, 0), (x, 360), (100, 100, 100), 1)
+        for y in range(0, 360, 40):
+            cv2.line(img, (0, y), (480, y), (100, 100, 100), 1)
+        with STATE.lock:
+            sx, sy, heading = STATE.x, STATE.y, STATE.heading
+            motors = STATE.motors_on; batt = STATE.battery
+            speed = STATE.speed_ms; angle = STATE.angle
+            start = STATE.start_stop
+        pxc = int(240 + sx * 40); pyc = int(180 - sy * 40)
+        ex, ey = math.cos(heading), math.sin(heading)
+        nx, ny = -ey, ex
+        hl, hw = 14.0, 8.0
+        corners = np.array([
+            (pxc + hl * ex + hw * nx, pyc + hl * ey + hw * ny),
+            (pxc + hl * ex - hw * nx, pyc + hl * ey - hw * ny),
+            (pxc - hl * ex - hw * nx, pyc - hl * ey - hw * ny),
+            (pxc - hl * ex + hw * nx, pyc - hl * ey + hw * ny),
+        ], dtype=np.int32)
+        color = (0, 200, 0) if motors else (200, 0, 0)
+        cv2.fillConvexPoly(img, corners, color)
+        cv2.line(img, (pxc, pyc), (int(pxc + 20 * ex), int(pyc + 20 * ey)), (255, 255, 0), 2)
+        cv2.putText(img, f"SIMULADOR x={sx:.1f} y={sy:.1f} h={math.degrees(heading) % 360:.0f}",
+                    (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(img, f"MOT={'ON' if motors else 'OFF'} START={start} BATT={batt:.0f}%",
+                    (8, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(img, f"ANG={angle:+.2f} SPD={speed:.2f} m/s",
+                    (8, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        return (buf.tobytes(), "image/jpeg") if ok else (None, "image/jpeg")
+    return (_make_frame_png(), "image/png")
 
 
 def camera_loop():
-    global CURRENT_JPEG
+    global CURRENT_FRAME, CURRENT_MIME
     while True:
-        frame = _make_frame_jpeg()
+        frame, mime = _make_frame()
         if frame:
-            with JPEG_LOCK:
-                CURRENT_JPEG = frame
+            with FRAME_LOCK:
+                CURRENT_FRAME = frame
+                CURRENT_MIME = mime
         time.sleep(0.1)  # ~10 fps
 
 # --------------------------------------------------------------------------
-# Handlers HTTP
+# HTML
 # --------------------------------------------------------------------------
 BOUNDARY = "boundarydonotcross"
 LOGIN_HTML = """<!DOCTYPE html>
@@ -358,10 +505,10 @@ LOGIN_HTML = """<!DOCTYPE html>
 HOME_HTML = """<!DOCTYPE html>
 <html><head><title>DeepRacer Simulador — Control</title>
 <style>
-body{{font-family:sans-serif;background:#111;color:#ddd;margin:20px}}
-table{{border-collapse:collapse}} td{{padding:4px 10px}}
-.big{{font-size:2em}} .on{{color:#0f0}} .off{{color:#f33}}
-#cmd{{font-family:monospace;background:#000;padding:10px}}
+body{font-family:sans-serif;background:#111;color:#ddd;margin:20px}
+table{border-collapse:collapse} td{padding:4px 10px}
+.big{font-size:2em} .on{color:#0f0} .off{color:#f33}
+#cmd{font-family:monospace;background:#000;padding:10px}
 </style></head>
 <body>
 <h2>🚗 DeepRacer Simulador — Estado y control</h2>
@@ -369,7 +516,7 @@ table{{border-collapse:collapse}} td{{padding:4px 10px}}
 <div style="margin:10px 0">
 <img id="cam" src="/route?topic=/camera_pkg/display_mjpeg&width=480&height=360"
      style="border:2px solid #444;border-radius:6px;max-width:640px;width:100%"
-     alt="Cámara simulada — el robotcito gris sobre el piso">
+     alt="Cámara simulada — el robotcito sobre el piso">
 </div>
 <table>
 <tr><td>drive_mode</td><td id="drive_mode">-</td></tr>
@@ -384,9 +531,9 @@ table{{border-collapse:collapse}} td{{padding:4px 10px}}
 </table>
 <hr>
 <h3>Controles</h3>
-<button onclick="api('drive_mode',{{'drive_mode':'manual'}})">Modo manual</button>
-<button onclick="api('start_stop',{{'start_stop':'start'}})">START</button>
-<button onclick="api('start_stop',{{'start_stop':'stop'}})">STOP</button>
+<button onclick="api('drive_mode',{'drive_mode':'manual'})">Modo manual</button>
+<button onclick="api('start_stop',{'start_stop':'start'})">START</button>
+<button onclick="api('start_stop',{'start_stop':'stop'})">STOP</button>
 <br><br>
 angle: <input id="angle" type="range" min="-1" max="1" step="0.01" value="0">
 throttle: <input id="throttle" type="range" min="-1" max="1" step="0.01" value="0">
@@ -397,22 +544,22 @@ max_speed: <input id="max_speed" type="range" min="0" max="1" step="0.05" value=
 <button onclick="stopLoop()">■ Parar loop</button>
 <script>
 let loopId=null;
-function api(path,body){{fetch('/api/'+path,{{method:'PUT',headers:{{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}},body:JSON.stringify(body)}}).then(r=>r.json()).then(j=>log('PUT /api/'+path+' -> '+JSON.stringify(j)))}}
-function sendCmd(){{const a=+document.getElementById('angle').value,t=+document.getElementById('throttle').value,m=+document.getElementById('max_speed').value;api('manual_drive',{{angle:a,throttle:t,max_speed:m}})}}
-function sendLoop(){{stopLoop();loopId=setInterval(sendCmd,80)}}
-function stopLoop(){{if(loopId)clearInterval(loopId);loopId=null}}
-function log(t){{const d=document.getElementById('cmd');d.textContent=t+'\\n'+d.textContent}}
-setInterval(()=>{{fetch('/mock/state').then(r=>r.json()).then(s=>{{
+function api(path,body){fetch('/api/'+path,{method:'PUT',headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},body:JSON.stringify(body)}).then(r=>r.json()).then(j=>log('PUT /api/'+path+' -> '+JSON.stringify(j)))}
+function sendCmd(){const a=+document.getElementById('angle').value,t=+document.getElementById('throttle').value,m=+document.getElementById('max_speed').value;api('manual_drive',{angle:a,throttle:t,max_speed:m})}
+function sendLoop(){stopLoop();loopId=setInterval(sendCmd,80)}
+function stopLoop(){if(loopId)clearInterval(loopId);loopId=null}
+function log(t){const d=document.getElementById('cmd');d.textContent=t+'\\n'+d.textContent}
+setInterval(()=>{fetch('/mock/state').then(r=>r.json()).then(s=>{
 document.getElementById('drive_mode').textContent=s.drive_mode;
 document.getElementById('start_stop').textContent=s.start_stop;
 const m=document.getElementById('motors');m.textContent=s.motors_on?'ON':'OFF';m.className=s.motors_on?'on':'off';
 document.getElementById('battery').textContent=s.battery+'%';
 document.getElementById('dz').textContent=s.dead_zone_effective;
 document.getElementById('cmd_hz').textContent=s.cmd_hz+' Hz';
-document.getElementById('pose').textContent=`x=${{s.x}} y=${{s.y}} heading=${{s.heading_deg}}°`;
+document.getElementById('pose').textContent=`x=${s.x} y=${s.y} heading=${s.heading_deg}°`;
 document.getElementById('speed').textContent=s.speed_ms+' m/s';
 document.getElementById('led').textContent=JSON.stringify(s.led);
-}})}},300);
+}})},300);
 </script>
 </body></html>"""
 
@@ -444,16 +591,8 @@ class MockHandler(BaseHTTPRequestHandler):
         return self.rfile.read(length)
 
     def _authed(self):
-        """Requiere cookie de sesión autenticada + CSRF válido en X-CSRF-Token."""
+        """Requiere cookie de sesión autenticada (el CSRF via header es bonus)."""
         _, authed = parse_session(self.headers.get("Cookie"))
-        if not authed:
-            return False
-        csrf = self.headers.get("X-CSRF-Token") or self.headers.get("X-CSRFToken")
-        if csrf_valid(csrf):
-            return True
-        # El header CSRF puede faltar en algunos clientes viejos; la cookie
-        # autenticada ya valida la sesión (fiel al contrato real: la cookie
-        # lleva el csrf adentro).
         return authed
 
     # -- rutas --
@@ -505,7 +644,6 @@ class MockHandler(BaseHTTPRequestHandler):
             self._do_login()
             return
 
-        # Endpoints de control autenticados
         if path in ("/api/drive_mode", "/api/start_stop", "/api/manual_drive",
                     "/api/set_led_color", "/api/get_led_color"):
             if not self._authed():
@@ -524,7 +662,6 @@ class MockHandler(BaseHTTPRequestHandler):
         form = urllib.parse.parse_qs(raw.decode())
         password = (form.get("password") or [""])[0]
         csrf = (form.get("csrf_token") or [""])[0]
-        # El CSRF debe venir en el body y existir en nuestro store.
         if not csrf_valid(csrf):
             send_json(self, {"success": False, "error": "invalid csrf"}, 403)
             return
@@ -567,15 +704,14 @@ class MockHandler(BaseHTTPRequestHandler):
                 STATE.motors_on = False
                 STATE.throttle = 0.0
         elif path == "/api/manual_drive":
-            # Contrato actual: {angle, throttle, max_speed}
             if "angle" not in data and "throttle" not in data and "drive_control" not in data:
                 send_json(self, {"success": False, "error": "missing fields"}, 400)
                 return
             if "drive_control" in data:
-                # Contrato viejo (iteración anterior): drive_control{throttle, steering_angle}
+                # Contrato viejo (iteración anterior)
                 dc = data["drive_control"]
-                angle = float(dc.get("steering_angle", 0.0)) / 45.0  # grados -> [-1,1]
-                throttle = float(dc.get("throttle", 0.0)) / 100.0    # -100..100 -> [-1,1]
+                angle = float(dc.get("steering_angle", 0.0)) / 45.0
+                throttle = float(dc.get("throttle", 0.0)) / 100.0
                 max_speed = 1.0
             else:
                 angle = float(data.get("angle", 0.0))
@@ -600,13 +736,14 @@ class MockHandler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
 
         if path == "/snapshot":
-            with JPEG_LOCK:
-                frame = CURRENT_JPEG
+            with FRAME_LOCK:
+                frame = CURRENT_FRAME
+                mime = CURRENT_MIME
             if not frame:
-                send_json(self, {"success": False, "error": "no frame (install opencv)"}, 503)
+                send_json(self, {"success": False, "error": "no frame"}, 503)
                 return
             self.send_response(200)
-            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Type", mime)
             self.send_header("Content-Length", str(len(frame)))
             self.end_headers()
             self.wfile.write(frame)
@@ -621,12 +758,13 @@ class MockHandler(BaseHTTPRequestHandler):
         try:
             last = None
             while True:
-                with JPEG_LOCK:
-                    frame = CURRENT_JPEG
+                with FRAME_LOCK:
+                    frame = CURRENT_FRAME
+                    mime = CURRENT_MIME
                 if frame is not None and frame is not last:
                     last = frame
                     self.wfile.write(b"--" + BOUNDARY.encode() + b"\r\n")
-                    self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                    self.wfile.write(b"Content-Type: " + mime.encode() + b"\r\n")
                     self.wfile.write(b"Content-Length: " + str(len(frame)).encode() + b"\r\n\r\n")
                     self.wfile.write(frame)
                     self.wfile.write(b"\r\n")
@@ -666,13 +804,13 @@ def main():
     threading.Thread(target=physics_loop, daemon=True).start()
     threading.Thread(target=camera_loop, daemon=True).start()
 
-    print(f"🧪 DeepRacer Simulador (mock)")
+    print("🧪 DeepRacer Simulador (mock)")
     print(f"   API HTTPS   : https://127.0.0.1:{HTTPS_PORT}/login  (password: {API_PASSWORD})")
     print(f"   Dashboard   : https://127.0.0.1:{HTTPS_PORT}/home")
     print(f"   MJPEG HTTP  : http://127.0.0.1:{HTTP_PORT}/stream_viewer?topic=/camera_pkg/display_mjpeg")
     print(f"   Estado      : https://127.0.0.1:{HTTPS_PORT}/mock/state")
     print(f"   Watchdog    : {WATCHDOG_MS} ms | dead zone: {DEAD_ZONE} | sign: {THROTTLE_SIGN} (neg=adelante)")
-    print(f"   opencv/cv2  : {'OK — frames sintéticos con HUD' if HAVE_CV else 'NO — stream placeholder (instala opencv para HUD)'}")
+    print(f"   opencv/cv2  : {'OK — frames sintéticos con HUD' if HAVE_CV else 'NO — PNG puro (sin HUD de cv2)'}")
     print("   Ctrl+C para salir.")
     try:
         threading.Thread(target=https_server.serve_forever, daemon=True).start()
