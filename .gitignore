@@ -21,6 +21,7 @@ hermes/state.db*
 hermes/gateway.lock
 hermes/gateway.pid
 hermes/gateway_state.json
+hermes/.clean_shutdown
 hermes/kanban.db
 hermes/kanban.db.*
 hermes/channel_directory.json
