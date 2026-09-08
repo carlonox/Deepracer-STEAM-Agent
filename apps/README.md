@@ -10,3 +10,4 @@ Aplicaciones del proyecto organizadas por responsabilidad.
 | [`rag/`](rag/README.md) | Buscador semántico de manuales del aula STEAM. | — |
 | [`speech-to-text/`](speech-to-text/README.md) | Reconocimiento de voz local. | — |
 | [`text-to-speech/`](text-to-speech/README.md) | Síntesis de voz local. | — |
+| [`simulator/`](simulator/README.md) | Mock de la API del DeepRacer para desarrollo sin robot (19 tests). | 5001 HTTPS, 8080 HTTP |
