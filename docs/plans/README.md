@@ -11,3 +11,4 @@ Tareas pendientes, próximas actividades y visión del proyecto.
 | `plan-hardening-firewall.md` | Hardening de red/firewall del robot: Tailscale, puertos cerrados, persistencia (2026-09-05). |
 | `plan-voz.md` | Darle oídos y voz a la mascota: STT/TTS heredados, servicios HTTP, micrófono remoto (celular), integración con el agente (2026-09-05). |
 | `actividad-aruco.md` | Próxima actividad de navegación ArUco. |
+| `bt-teleop.md` | Teleoperación BLE standalone (celu/Quest, sin backend): protocolo, bridge, fail-safe y fases (2026-09-08). |
