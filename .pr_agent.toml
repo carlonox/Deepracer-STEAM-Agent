@@ -3,7 +3,7 @@
 # dashboard de OpenRouter (tier gratuito, ~1000 req/día sobra a este volumen).
 
 [config]
-model = "openrouter/google/gemini-2.0-flash-001"
+model = "openrouter/thinkingmachines/inkling:free"
 fallback_models = ["openrouter/meta-llama/llama-3.3-70b-instruct:free"]
 # Obligatorio para IDs fuera de la tabla MAX_TOKENS de PR-Agent.
 custom_model_max_tokens = 200000
