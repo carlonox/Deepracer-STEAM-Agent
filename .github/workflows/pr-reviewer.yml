@@ -49,6 +49,8 @@ jobs:
           # Estas env cubren la primera revisión; el toml manda después.
           config.model: "openrouter/google/gemini-2.0-flash-001"
           config.fallback_models: '["openrouter/meta-llama/llama-3.3-70b-instruct:free"]'
+          # Sin esto PR-Agent rechaza IDs que no trae en su tabla MAX_TOKENS.
+          config.custom_model_max_tokens: "200000"
           github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "false"
