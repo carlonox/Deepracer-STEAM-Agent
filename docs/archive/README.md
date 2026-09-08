@@ -6,3 +6,4 @@ Contenido histórico que ya no es operativo. No usar como guía vigente.
 |---|---|
 | `SpeedRacerv.2/` | Proyecto anterior (2025): documentos, artefactos y entorno ROS2 exportado. Puede contener credenciales de dispositivos antiguos; no es configuración activa. |
 | `SpeedRacerv.2/INDICE_DOCUMENTACION.md` | Catálogo del proyecto archivado. |
+| `SOUL-legacy-20260908.md` | Identidad legacy de SpeedRacer archivada 2026-09-08 (Fase 2). Superseded por `hermes/soul/soul.md`. |
