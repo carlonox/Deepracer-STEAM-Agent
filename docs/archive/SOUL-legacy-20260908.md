@@ -1,3 +1,7 @@
+> **ARCHIVADO 2026-09-08** — Identidad legacy de SpeedRacer (Fase 2). Superseded por `hermes/soul/soul.md` (única fuente vigente). Se conserva por historia; NO usar como guía. Contradicciones al archivar: control por SSH (vigente: backend :5002), IP 10.203.150.56 (vigente: red U), ESP32/KY-037 (vigente: descartado), throttle negativo=adelante (vigente: verificar por boot).
+
+---
+
 # Soul - SpeedRacer AI Mascota
 
 ## Identidad
