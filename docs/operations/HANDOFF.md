@@ -312,3 +312,75 @@ OUT    ───→   D4  (GPIO 4)
 - [ ] Consultar referencias: `esp32-identification.md`, `deepracer-hardware-inventory.md`
 - [ ] Skills guardados en: `/opt/data/skills/robotics/deepracer-control/`
 - [ ] Firmware actual: `/opt/data/home/esp32_pio/src/main.py`
+
+---
+
+## 🧩 Sesión 2026-09-08: tándem aula día completo (Muse Spark + operador)
+
+Leer con: `docs/operations/sesion-2026-09-08.md` (bitácora física),
+`docs/plans/plan-evolucion-agente.md` (Fases), `docs/development/pr-reviewer.md`.
+
+### Estado git al cierre
+- `main` = merge #13. Abiertos: #14 (`docs/bt-teleop`), #15 (`fix/camera-native-res`).
+  `fix/vr-triggers` pusheada, **sin PR** (abrirlo).
+- Ramas remotas huérfanas por borrar tras merge: `docs/org-audit-sep`,
+  `docs/robot-snapshot` (ya mergeadas #12/#13).
+- Rama local `backup-pre-reset-20260907`: último respaldo pre-rewrite; borrar
+  cuando el dueño confirme.
+
+### Robot (amss-wuot) al cierre
+- Red: WiFi `NachoNacho` (ojo: es el hotspot de OTRO robot "nacho", invitados).
+  DHCP mueve la LAN (`.103` → `.106`). **Canal oficial: Tailscale `100.117.192.31`.**
+- `.env` del operador (él lo edita, yo nunca): `DEEPRACER_HOST`=Tailscale,
+  `DEEPRACER_API_PORT=443`, `VITE_AWS_HOST`=LAN `.106` (el Quest no tiene Tailscale).
+- Clave API: reseteada con `reset_default_password.py` (determinística del serial;
+  aceptado así). Device token: rotación pendiente.
+- Reloj: `timedatectl set-ntp true` + reboot (el cron `@reboot`+`ntpdate` falla sin red).
+- Cámara: `uvcvideo: Buffer is NULL` → `sudo reboot` la revivió.
+- Backend habla HTTPS fijo; el `:5001` directo sirve HTTP plano (TLS solo en nginx `:443`).
+- Batería LiPo a medias → dead-zone crecido; tracción en suelo pendiente con carga full.
+
+### Números medidos hoy (elevado salvo nota; ráfagas fire-and-forget ~10-25 cmds/s)
+- Convención boot: **negativo=adelante** (igual 2026-07-31).
+- Adelante mueve desde ≈-0.40-norm; reversa exige ≈+0.55–0.60-norm (real ~0.78-0.80). Asimétrica.
+- Suelo: ni 0.75-real desplazó (batería). Velocidad x/y con esfero: pendiente.
+- Causa raíz del día: cable motor↔ruedas suelto (API 200 igual, motor sonaba sin girar).
+- Trim: bajado en vivo a `-0.005` (deriva izq con `-0.01`); feedback pendiente.
+- Tasa medida backend→robot: ~16 Hz sync; Tailscale directo 39 ms pero con picos de 2.8 s (red saturada); LAN 48-240 ms.
+
+### ESP32 (conectado al robot, `/dev/ttyUSB0`)
+- Tenía FW v1 (anuncia `ESP32 iniciado`, sin BLE; 28 dispositivos BLE alrededor, ninguno era él).
+- Subido BLE v2 por raw REPL vía backend `/api/exec` ( alcance sin credenciales).
+- Bug real corregido: handles v1.28 son directos (`service[0][0]`), no dicts (crasheaba boot).
+- Archivo corregido: `hermes/home/esp32_pio/src/main.py` (volumen, NO trackeado).
+- Verificado: anuncia `DeepRacer-ESP32` (E0:5A:1B:9D:A5:AE), GATT+NUS+write OK desde PC (`bleak`), visible en celu.
+- Sin KY-037 puesto: eventos de sonido = ruido flotante (esperado).
+- Decisión abierta: sensor descartado el 05-09; reavivado como teleop (`docs/plans/bt-teleop.md`, PR #14).
+
+### Quest 3 (confirmado modelo)
+- Sin eye-tracking; Touch Plus al casco (no al PC). Ir por navegador en casco.
+- Hallazgo: `QuestVRControls.jsx` muerto (nunca renderizado); modo VR usaba eventos de **rueda de mouse**.
+- Fix en `fix/vr-triggers` (sin PR): VR maneja con triggers proporcionales (RT adelante, LT atrás, stick gira) + sesión XR real + stop al soltar. FALTA PROBAR EN CASCO.
+- Cámara en Quest: va por `VITE_AWS_HOST` (LAN, el Quest no tiene Tailscale).
+- Cámara frontend a resolución nativa 480x360 (PR #15) por latencia de upscale.
+- Ajuste físico Quest: encajar casco + IPD; URL larga por dictado por voz + marcador.
+
+### Revisor propio (funciona, con lecciones)
+- Stack: PR-Agent + `openrouter/free` (auto-router; los IDs fijos se pudren: gemini retirado 404, inkling solo-agentic 403, llama:free dado de baja).
+- Cuota gratis: ~50/día (1000 solo con $10 en créditos alguna vez).
+- `.pr_agent.toml` solo se lee desde `main` (bootstrap por env); `synchronize` se pide explícito en `pr_actions`; `secrets` NO va en `if:` (usar gate shell); pinnear action por SHA; `custom_model_max_tokens: 200000`.
+- Publica 1 comentario por run (el estado persistente falla con "identity cannot be verified"): agrupar pushes.
+- CodeRabbit sigue activo (complementan: él genérico+estático, nuestro reglas robot). No desactivar.
+- Secreto `OPENROUTER_API_KEY` lo pone el mantenedor en Actions secrets.
+
+### Procesos y scripts al cierre (PC aula, mueren al apagar)
+- Backend node + frontend vite (PIDs anotados en sesión; re-arrancar si caídos).
+- Scripts reutilizables en `C:\Users\UNAL\AppData\Local\Temp\opencode\`: `burst.py <thr> <s>`, `ramp.py` (editar vector), `cal.py <offset>`, `rate.py`, `rexec.py [@file]`, `ble-scan.py`, `ble-test.py`, `stage*.py`, `to-robot*.txt`, `esp-*.sh`, `ble_up_local.py`.
+
+### Pendiente priorizado próxima sesión
+1. Probar VR triggers en casco + feedback trim/dirección.
+2. Mergear #14, #15 (+ abrir PR de `fix/vr-triggers`).
+3. LiPo full → tracción en suelo + x/y con esfero + trim final.
+4. RAG deps + Ollama (Fase 4); Hermes upgrade + backup (Fase 1.5, Docker).
+5. Colaboradores en GitHub (fin del bypass); rotar la clave pegada en chat.
+6. Vault/bridge BT (Fase 1 de bt-teleop) si se adopta teleop.
