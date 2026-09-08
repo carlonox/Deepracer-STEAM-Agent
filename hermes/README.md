@@ -8,7 +8,7 @@ configuración mantenida por el proyecto con estado persistente de ejecución.
 | Ruta | Propósito |
 |---|---|
 | `config.template.yaml` | Plantilla pública de configuración. |
-| `SOUL.md` y `soul/` | Identidad y personalidad del agente. |
+| `soul/soul.md` | Identidad y personalidad del agente (única fuente vigente; legacy en `docs/archive/SOUL-legacy-20260908.md`). |
 | `skills/` | Habilidades y referencias del DeepRacer. |
 | `scripts/` | Diagnóstico y exploración del robot. |
 | `memories/` | Memoria curada cuando se decide conservarla. |
