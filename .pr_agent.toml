@@ -5,7 +5,6 @@
 [config]
 # Auto-router gratis (2026-09-08): OpenRouter elige entre los :free vigentes.
 # Los IDs fijos se pudren (gemini-2.0-flash retirado, inkling solo-agentic).
-[config]
 model = "openrouter/free"
 fallback_models = ["openrouter/qwen/qwen3-next-80b-a3b-instruct:free"]
 # Obligatorio para IDs fuera de la tabla MAX_TOKENS de PR-Agent.
