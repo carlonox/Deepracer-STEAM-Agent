@@ -87,6 +87,79 @@ Accesos:
 
 ---
 
+## 7. Opción A — Vault local + QR (costo $0, apertura manual)
+
+> Para PC compartido del aula con 3-4 operadores. BWS Free solo da 2
+> humanos; esta opción no depende de cuentas en la nube.
+
+**Idea:** las credenciales viven en UN archivo cifrado (`secrets.age`,
+con `age`), cuya llave se deriva de DOS partes: algo que sabés (PIN del
+equipo) + algo que tenés (secreto de 32 bytes impreso como QR). Sin las
+dos partes no se abre nada. Nunca hay `.env` en texto plano en disco.
+
+- **Generar (una vez, en máquina confiable):** secreto aleatorio 32 bytes
+  → QR impreso/laminado → cada uno de los 4 lo guarda en su celu (NO
+  pegado en la pared). Con `PIN + secreto_QR` se cifra el vault inicial.
+- **Abrir (cada jornada):** correr `scripts/unlock-vault.ps1` → pide el
+  PIN + escanear el QR con la webcam (OpenCV + pyzbar) o pegarlo a mano
+  → descifra a RAM, inyecta env vars y arranca el backend. Nada queda
+  en disco.
+- **Cerrar:** `scripts/lock-vault.ps1` mata el backend y limpia las vars.
+  Se dispara solo al bloquear Windows, tras X horas, o manual.
+- **Si se filtra:** una FOTO del QR sola no alcanza (falta el PIN). Si
+  alguien sale del equipo se regenera QR + PIN y se re-cifra (5 min).
+- **Límite honesto:** el QR NO se auto-detecta. Hay que escanearlo a
+  propósito cada vez. Si querés "lo conecto y se abre solo", eso es la
+  Opción B (USB).
+
+## 8. Opción B — Vault local + USB keyfile (auto-detect, ~$5)
+
+**Idea:** igual que la Opción A, pero la mitad física vive en una USB
+(`keyfile` de 64 bytes aleatorios) en vez de un QR. Windows SÍ detecta
+la USB sola, así que el desbloqueo/bloqueo puede ser automático.
+
+- **Generar:** `keyfile` aleatorio en la USB (identificada por su Volume
+  Serial, no por letra `E:`/`F:`) + PIN del equipo → cifran `secrets.age`.
+  Una USB por equipo (o una por persona si quieren revocación individual).
+- **Abrir:** al insertar la USB, un watcher PowerShell (evento WMI
+  `Win32_VolumeChangeEvent` o tarea programada) corre `unlock-usb.ps1` →
+  pide el PIN → verifica el `keyfile` → descifra a RAM y levanta el backend.
+- **Cerrar:** al EXTRAER la USB el mismo watcher corre `lock-usb.ps1` →
+  mata backend + limpia env vars. Sin USB puesta no hay credenciales vivas.
+- **Si se pierde/roba:** la USB sola no alcanza (falta el PIN). Se revoca
+  re-cifrando con un `keyfile` nuevo. Una USB se puede copiar igual que un
+  QR, por eso el PIN es obligatorio en ambas opciones.
+- **Costo:** una USB cualquiera (~$5). Lo único "automático" de las dos
+  opciones.
+
+## 9. Matriz y protocolo de prueba (probar A primero, B después)
+
+| | QR (A) | USB (B) |
+|---|---|---|
+| Costo | $0 | ~$5 |
+| Auto-detect | No (escaneo manual) | Sí (insertar/sacar) |
+| Copiable a escondidas | Sí (foto) | Sí (copia archivo) |
+| Mitigación | PIN obligatorio + rotación | PIN obligatorio + rotación |
+| Ideal para | Probar YA sin comprar nada | Uso diario si el escaneo aburre |
+
+**Pre-requisito de ambas (sin esto todo es cosmético):** cuentas de
+Windows individuales + BitLocker + bloqueo automático de sesión. Si el PC
+queda con sesión abierta, ningún vault sirve.
+
+**Prueba A (QR):** generar QR de prueba → cifrar UN secreto falso →
+probar unlock/lock en el PC de la U → medir tiempo y fricción.
+**Prueba B (USB):** misma prueba con USB + watcher → verificar que al
+sacar la USB el backend muere y las vars se limpian.
+**Éxito:** abrir <1 min, cerrar automático verificado, nadie dejó texto
+plano, rotación practicada una vez.
+
+> Nota 2FA: QR+PIN (o USB+PIN) YA es 2FA — posesión + conocimiento. El
+> TOTP tipo Google Authenticator es OTRO 2FA distinto, para logins online
+> (GitHub), no para descifrar archivos locales porque rota cada 30 s.
+> Se usan los dos: TOTP para GitHub, QR/USB+PIN para el vault del robot.
+
+---
+
 *Patrón aplicado: el mismo stack de secretos que usa la infraestructura
 personal del mantenedor (BWS + machine accounts), adaptado a un repo con
 varios operadores.*
