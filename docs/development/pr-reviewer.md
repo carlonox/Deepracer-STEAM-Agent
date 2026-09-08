@@ -35,6 +35,21 @@ respecto al Free, así que el revisor + CI + secret-scan corren sin pelear
 cuota. No habilita nada de CodeRabbit (es otro vendor): el "Pro" que
 importa acá es minutos de runner + las reglas de protección de rama.
 
+## Estado real de MCP y skills (verificado 2026-09-08, sin humo)
+
+- **MCP asignado: ninguno.** El action PR-Agent hace llamadas single-shot
+  sin tool-use loop: no ejecuta scripts ni consume MCP servers. Un MCP solo
+  cabe en un job custom aparte (runner levanta el server y lo consume en el
+  mismo job) — futuro, no actual.
+- **Skills cargadas hoy:** `AGENTS.md` (auto-inyección de PR-Agent) +
+  `extra_instructions` escritas a mano en `.pr_agent.toml`. Los 4
+  `SKILL.md` de `hermes/skills/robotics/` **no** los carga: `skills.paths`
+  es solo host-level por seguridad (un repo que lo definiera podría exfiltrar
+  archivos del host al prompt) y se ignora con warning si viene del repo.
+- Para que las skills pesen de verdad hay dos vías: destilar sus reglas a
+  `extra_instructions` (hecho) o un job revisor custom que lea
+  `hermes/skills/**` como contexto (pendiente, patrón Thalor expert-panel).
+
 ## Qué puede hacer un Action (MCP, skills, herramientas: sí, gratis)
 
 Un runner de GitHub es una VM completa por minutos: puede correr lo mismo
