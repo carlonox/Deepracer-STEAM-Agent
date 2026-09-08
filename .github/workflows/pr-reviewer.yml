@@ -47,8 +47,10 @@ jobs:
           OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
           # Bootstrap: .pr_agent.toml solo se lee desde main (tras el merge).
           # Estas env cubren la primera revisión; el toml manda después.
-          config.model: "openrouter/thinkingmachines/inkling:free"
-          config.fallback_models: '["openrouter/meta-llama/llama-3.3-70b-instruct:free"]'
+          # Auto-router gratis: OpenRouter elige entre los :free vigentes.
+          # Evita la ruleta de IDs retirados (gemini-2.0-flash, inkling solo-agentic).
+          config.model: "openrouter/free"
+          config.fallback_models: '["openrouter/qwen/qwen3-next-80b-a3b-instruct:free"]'
           # Sin esto PR-Agent rechaza IDs que no trae en su tabla MAX_TOKENS.
           config.custom_model_max_tokens: "200000"
           github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
