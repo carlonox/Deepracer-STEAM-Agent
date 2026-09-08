@@ -37,15 +37,24 @@ importa acá es minutos de runner + las reglas de protección de rama.
 
 ## Estado real de MCP y skills (verificado 2026-09-08, sin humo)
 
+Dos fases de configuración (no confundirlas):
+
+1. **Bootstrap (pre-merge):** el workflow pasa por env `config.model`,
+   `config.fallback_models`, `config.response_language`,
+   `pr_reviewer.extra_instructions` y `github_action_config.*`.
+2. **Post-merge:** PR-Agent lee `.pr_agent.toml` desde `main` (misma info,
+   fuente persistente). Las env del workflow siguen ganando por precedencia.
+3. **Carga por defecto siempre activa:** `AGENTS.md` (y `SKILL.md` donde
+   aplique el estándar) se inyectan en cada revisión. Lo único excluido son
+   los 4 `SKILL.md` de `hermes/skills/robotics/`: `skills.paths` es solo
+   host-level por seguridad y el repo no puede redirigirlo.
+
 - **MCP asignado: ninguno.** El action PR-Agent hace llamadas single-shot
   sin tool-use loop: no ejecuta scripts ni consume MCP servers. Un MCP solo
   cabe en un job custom aparte (runner levanta el server y lo consume en el
   mismo job) — futuro, no actual.
-- **Skills cargadas hoy:** `AGENTS.md` (auto-inyección de PR-Agent) +
-  `extra_instructions` escritas a mano en `.pr_agent.toml`. Los 4
-  `SKILL.md` de `hermes/skills/robotics/` **no** los carga: `skills.paths`
-  es solo host-level por seguridad (un repo que lo definiera podría exfiltrar
-  archivos del host al prompt) y se ignora con warning si viene del repo.
+- **Skills cargadas hoy:** `AGENTS.md` (auto) + `extra_instructions`
+  (primero por env, luego por toml). Ver punto 3 para el alcance exacto.
 - Para que las skills pesen de verdad hay dos vías: destilar sus reglas a
   `extra_instructions` (hecho) o un job revisor custom que lea
   `hermes/skills/**` como contexto (pendiente, patrón Thalor expert-panel).
