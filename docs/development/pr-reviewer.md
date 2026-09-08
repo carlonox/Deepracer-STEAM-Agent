@@ -1,7 +1,8 @@
 # Revisor propio de PRs (gratuito)
 
 > **Estado:** implementado en rama `feature/pr-reviewer` (PR pendiente).
-> **Fecha:** 2026-09-08. **Costo:** $0 (Actions + OpenRouter tier gratuito).
+> **Fecha:** 2026-09-08. **Costo:** $0 (Actions + OpenRouter tier gratuito:
+> 50 req/día y 20/min; 1000/día solo con $10 en créditos alguna vez).
 
 ## Qué es
 
@@ -15,7 +16,7 @@ gates físicos, Conventional Commits del repo). Stack: **PR-Agent**
 
 | Archivo | Rol |
 |---|---|
-| `.github/workflows/pr-reviewer.yml` | Corre en cada PR (`opened`, `synchronize`). Se omite solo si falta el secreto. |
+| `.github/workflows/pr-reviewer.yml` | Corre en cada PR (`opened`, `synchronize`, `reopened`, `ready_for_review`). Se omite si falta el secreto o si el autor es un bot. |
 | `.pr_agent.toml` | Modelo barato + `fallback_models`, respuesta en español e `extra_instructions` con las reglas del robot. PR-Agent ya lee `AGENTS.md` y `SKILL.md` por defecto. Ojo bootstrap: el toml solo se lee desde `main`, así que el workflow lleva modelo/fallback/`pr_actions` por env hasta el merge. |
 
 ## Secreto requerido (lo pone un mantenedor, nunca en el repo)
