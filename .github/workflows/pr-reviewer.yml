@@ -27,13 +27,20 @@ jobs:
       GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
       OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
     steps:
-      - name: Revisar sin secreto configurado → omitir
-        if: "${{ secrets.OPENROUTER_API_KEY == '' }}"
-        run: >
-          echo "OPENROUTER_API_KEY ausente: se omite la revision propia."
+      - id: check
+        name: Verificar secreto (sin exponerlo)
+        run: |
+          if [ -n "${OPENROUTER_KEY:-}" ]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            echo "OPENROUTER_API_KEY ausente: se omite la revision propia."
+          fi
+        env:
+          OPENROUTER_KEY: "${{ secrets.OPENROUTER_API_KEY }}"
 
       - name: PR-Agent (OpenRouter)
-        if: "${{ secrets.OPENROUTER_API_KEY != '' }}"
+        if: steps.check.outputs.has_key == 'true'
         uses: The-PR-Agent/pr-agent@main
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
