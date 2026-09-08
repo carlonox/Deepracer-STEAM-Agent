@@ -6,7 +6,8 @@ export default function CameraFeed() {
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const AWS_HOST = import.meta.env.VITE_AWS_HOST || "localhost";
-  const cameraUrl = `http://${AWS_HOST}:8080/stream?topic=/camera_pkg/display_mjpeg&width=1280&height=720`;
+  const cameraUrl =
+`http://${AWS_HOST}:8080/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360`;
 
   useEffect(() => {
     const handleFullscreenChange = () => {
