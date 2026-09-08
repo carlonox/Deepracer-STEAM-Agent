@@ -59,3 +59,17 @@ Hermes (Docker) ──HTTP──▶ Backend Node.js (Windows host:5002)
 - Container Docker NO tiene acceso a Tailscale
 - Firewall del robot: policy INPUT DROP — agregar `-s 10.0.0.0/8 -j ACCEPT`
 - Para movimiento: el comando debe ejecutarse EN el robot (subir script bash), no por SSH uno a uno
+
+## 📸 Snapshot 2026-09-08 (verificado en vivo, red NachoNacho + Tailscale)
+- **Hostname:** `amss-wuot` · **Tailscale estable:** `100.117.192.31` (canal oficial; el DHCP movió la LAN `.103` → `.106`)
+- **Acceso real:** API por nginx `:443` (el `:5001` directo sirve HTTP plano, sin TLS); cámara `:8080`; SSH `:22`
+- **Reloj:** sin RTC — congela apagado y mata Tailscale (mTLS). Fix: `timedatectl set-ntp true` (el cron `@reboot`+`ntpdate` falla sin red al bootear)
+- **Cámara:** `uvcvideo: Buffer is NULL` en loop → resolvió con `sudo reboot` (snapshot 200 ~10KB)
+- **Hardware:** cable motor↔ruedas suelto (API 200 igual, motor sonaba sin girar); re-conectado
+- **Convención boot:** negativo=adelante; reversa asimétrica (mínimo ~+0.55-0.60-norm vs adelante ~-0.40)
+- **Correcciones a este inventario (07-07):** LiDAR = solo software (sin módulo físico); IMU no soldada; throttle "recomendado 0.7" obsoleto (ver `deepracer-calibration`)
+
+## 🔁 Re-snapshot (sin secretos)
+Ejecutar en el robot `bash robot-snapshot.sh` (este directorio) y pegar la
+salida abajo con fecha. El script es solo-lectura y **nunca** imprime
+`password.txt`, `token.txt`, WiFi, SSH ni `.env` — verificar antes de commitear.
