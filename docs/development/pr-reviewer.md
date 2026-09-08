@@ -16,7 +16,7 @@ gates físicos, Conventional Commits del repo). Stack: **PR-Agent**
 | Archivo | Rol |
 |---|---|
 | `.github/workflows/pr-reviewer.yml` | Corre en cada PR (`opened`, `synchronize`). Se omite solo si falta el secreto. |
-| `.pr_agent.toml` | Modelo barato + `fallback_models`, respuesta en español e `extra_instructions` con las reglas del robot. PR-Agent ya lee `AGENTS.md` y `SKILL.md` por defecto. |
+| `.pr_agent.toml` | Modelo barato + `fallback_models`, respuesta en español e `extra_instructions` con las reglas del robot. PR-Agent ya lee `AGENTS.md` y `SKILL.md` por defecto. Ojo bootstrap: el toml solo se lee desde `main`, así que el workflow lleva modelo/fallback/`pr_actions` por env hasta el merge. |
 
 ## Secreto requerido (lo pone un mantenedor, nunca en el repo)
 
