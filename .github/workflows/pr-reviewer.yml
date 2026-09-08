@@ -1,0 +1,68 @@
+name: pr-reviewer
+
+# Revisor propio (gratuito): PR-Agent open-source + OpenRouter.
+# Complementa a CodeRabbit en reglas DEL ROBOT que el genérico no conoce
+# (canal backend-only, gates físicos, Conventional Commits del repo).
+# Requiere el secreto de repo OPENROUTER_API_KEY en Settings → Secrets
+# and variables → Actions (lo pone un mantenedor, nunca en el repo).
+# Sin ese secreto el job se omite en silencio.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-reviewer-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.sender.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    env:
+      GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+    steps:
+      - id: check
+        name: Verificar secreto (sin exponerlo)
+        run: |
+          if [ -n "${OPENROUTER_KEY:-}" ]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            echo "OPENROUTER_API_KEY ausente: se omite la revision propia."
+          fi
+        env:
+          OPENROUTER_KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+
+      - name: PR-Agent (OpenRouter)
+        if: steps.check.outputs.has_key == 'true'
+        # Pinneado a SHA (2026-09-08) anti supply-chain; subir con digest tras verificar.
+        uses: The-PR-Agent/pr-agent@29709d42e805fceab0a74580a191499b2d3c725a
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+          # Bootstrap: .pr_agent.toml solo se lee desde main (tras el merge).
+          # Estas env cubren la primera revisión; el toml manda después.
+          # Auto-router gratis: OpenRouter elige entre los :free vigentes.
+          # Evita la ruleta de IDs retirados (gemini-2.0-flash, inkling solo-agentic).
+          config.model: "openrouter/free"
+          config.fallback_models: '["openrouter/qwen/qwen3-next-80b-a3b-instruct:free"]'
+          config.response_language: "es"
+          pr_reviewer.extra_instructions: |
+            Prioriza SIEMPRE estas reglas del repo Deepracer-STEAM-Agent:
+            1. Canal fisico SOLO por backend Node (apps/backend :5002).
+            2. Nada de /api/start, /api/manual_drive ni scripts de manejo como prueba automatica.
+            3. Cero secretos nuevos (.env, tokens, claves, state.db, certs).
+            4. Conventional Commits 1.0.0 en titulos (type(scope): imperativo, 72 chars max).
+            5. Docs e indices van en la misma unidad de cambio.
+            6. Responde en espanol, conciso, con archivo:linea.
+          # Sin esto PR-Agent rechaza IDs que no trae en su tabla MAX_TOKENS.
+          config.custom_model_max_tokens: "200000"
+          github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_improve: "false"
