@@ -7,3 +7,4 @@ Documentos de arquitectura, inventarios técnicos y protocolos del proyecto.
 | `inventario-deepracer.md` | Inventario físico y de software del AWS DeepRacer. |
 | `protocolo-camara-esp32-udp.md` | Protocolo UDP de la cámara ESP32-S3. |
 | `navegacion-aruco.md` | Navegación por waypoints ArUco. |
+| `robot-snapshot.sh` | Colector solo-lectura del estado del robot (sin secretos) para re-snapshots. |
