@@ -16,6 +16,7 @@ import KeyboardControls from './components/controls/KeyboardControls';
 import useVehicleControl from './hooks/useVehicleControl';
 import useGamepad from './hooks/useGamepad';
 import useKeyboard from './hooks/useKeyboard';
+import useQuestVRInput from './hooks/useQuestVRInput';
 import { sendManualCommand, activateManualMode } from './services/vehicleApi';
 
 function App() {
@@ -28,6 +29,8 @@ function App() {
   
   const { isConnected: gamepadConnected } = useGamepad(manualMode, gamepadMode, maxSpeed, setMaxSpeed);
   const { pressedKeys } = useKeyboard(true, maxSpeed); // TODO: cambiar a manualMode
+  const { leftController, rightController, startSession: startXRSession, endSession: endXRSession } = useQuestVRInput();
+  const lastVRSent = useRef({ angle: 0, throttle: 0 });
 
   // Mouse/Pointer/Touch event logging - capture ALL event info
   useEffect(() => {
@@ -202,48 +205,32 @@ function App() {
     }
   }, [maxSpeed]);
 
-  // VR wheel event listener (only when VR mode is active)
+  // VR Mode: drive from real WebXR controller state (replaces the old
+  // mouse-wheel hack, which never read the headset).
+  // Right trigger = forward (proportional), left trigger = reverse,
+  // right stick X (fallback left) = steering. Scaled to the wheel-delta
+  // convention sendVRCommand already understands.
   useEffect(() => {
     if (!vrMode) return;
-    
-    let isMoving = false;
-    let decayInterval;
-
-    const handleWheel = (e) => {
-      e.preventDefault();
-      
-      // Get joystick direction from wheel deltas
-      const dirX = e.deltaX;
-      const dirY = e.deltaY;
-      
-      console.log(`🥽 VR Wheel: deltaX=${dirX.toFixed(1)} deltaY=${dirY.toFixed(1)}`);
-      isMoving = true;
-      setVrInput({ steering: dirX, throttle: dirY });
-      sendVRCommand(dirX, dirY);
-    };
-
-    // Check periodically if joystick was released (no wheel events = stopped)
-    decayInterval = setInterval(async () => {
-      const timeSinceLastInput = Date.now() - lastSendTime.current;
-      if (timeSinceLastInput > 150 && isMoving) {
-        isMoving = false;
+    const rt = rightController?.trigger ?? 0;
+    const lt = leftController?.trigger ?? 0;
+    const stickX = rightController?.stickX || leftController?.stickX || 0;
+    const active = rt >= 0.08 || lt >= 0.08 || Math.abs(stickX) >= 0.15;
+    if (!active) {
+      if (lastVRSent.current.active) {
+        lastVRSent.current = { active: false };
         setVrInput({ steering: 0, throttle: 0 });
-        console.log('🥽 VR: Joystick released - sending stop');
-        try {
-          await sendManualCommand(0, 0, maxSpeed);
-        } catch (error) {
-          console.error('Error sending stop command:', error);
-        }
+        console.log('🥽 VR: controls released - sending stop');
+        sendVRCommand(0, 0, true);
       }
-    }, 100);
-
-    window.addEventListener('wheel', handleWheel, { passive: false });
-
-    return () => {
-      window.removeEventListener('wheel', handleWheel);
-      clearInterval(decayInterval);
-    };
-  }, [vrMode, sendVRCommand]);
+      return;
+    }
+    lastVRSent.current = { active: true };
+    const dirX = stickX * 20;
+    const dirY = (lt - rt) * 20;
+    setVrInput({ steering: dirX, throttle: dirY });
+    sendVRCommand(dirX, dirY);
+  }, [vrMode, leftController, rightController, sendVRCommand]);
 
   // Activate VR mode (deactivates manual mode but initializes backend for manual control)
   const activateVR = async () => {
@@ -256,6 +243,14 @@ function App() {
       console.log('🥽 VR Mode: Backend initialized successfully');
     } catch (error) {
       console.error('Error initializing VR mode:', error);
+    }
+    // Best effort: open the WebXR session so controller state flows.
+    // Driving still works without it only if the browser exposes gamepads.
+    try {
+      const xrOk = await startXRSession();
+      if (!xrOk) console.warn('🥽 WebXR session not started: triggers/sticks unavailable in VR mode');
+    } catch (error) {
+      console.error('Error starting XR session:', error);
     }
   };
 
@@ -270,6 +265,7 @@ function App() {
   const handleStop = async () => {
     console.log('🛑 Stopping vehicle...');
     setVrMode(false);
+    try { await endXRSession(); } catch (error) { console.error('Error ending XR session:', error); }
     await stop();
   };
 
