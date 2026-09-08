@@ -45,6 +45,11 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+          # Bootstrap: .pr_agent.toml solo se lee desde main (tras el merge).
+          # Estas env cubren la primera revisión; el toml manda después.
+          config.model: "openrouter/google/gemini-2.0-flash-001"
+          config.fallback_models: '["openrouter/meta-llama/llama-3.3-70b-instruct:free"]'
+          github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "false"
           github_action_config.auto_improve: "false"
