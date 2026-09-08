@@ -21,7 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-      issues: write
       contents: read
     env:
       GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
@@ -41,7 +40,8 @@ jobs:
 
       - name: PR-Agent (OpenRouter)
         if: steps.check.outputs.has_key == 'true'
-        uses: The-PR-Agent/pr-agent@main
+        # Pinneado a SHA (2026-09-08) anti supply-chain; subir con digest tras verificar.
+        uses: The-PR-Agent/pr-agent@29709d42e805fceab0a74580a191499b2d3c725a
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
