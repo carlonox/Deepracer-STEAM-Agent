@@ -232,7 +232,7 @@ Deepracer-STEAM-Agent/
 ├── hermes/
 │   ├── README.md
 │   ├── config.template.yaml
-│   ├── SOUL.md
+│   ├── soul/soul.md          # identidad vigente (legacy en docs/archive/SOUL-legacy-20260908.md)
 │   ├── skills/
 │   ├── scripts/
 │   └── ...                    # estado persistente ignorado
