@@ -1,0 +1,43 @@
+name: pr-reviewer
+
+# Revisor propio (gratuito): PR-Agent open-source + OpenRouter.
+# Complementa a CodeRabbit en reglas DEL ROBOT que el genérico no conoce
+# (canal backend-only, gates físicos, Conventional Commits del repo).
+# Requiere el secreto de repo OPENROUTER_API_KEY en Settings → Secrets
+# and variables → Actions (lo pone un mantenedor, nunca en el repo).
+# Sin ese secreto el job se omite en silencio.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-reviewer-${{ github.event.number }}-${{ github.event.action }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.sender.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: read
+    env:
+      GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+    steps:
+      - name: Revisar sin secreto configurado → omitir
+        if: "${{ secrets.OPENROUTER_API_KEY == '' }}"
+        run: >
+          echo "OPENROUTER_API_KEY ausente: se omite la revision propia."
+
+      - name: PR-Agent (OpenRouter)
+        if: "${{ secrets.OPENROUTER_API_KEY != '' }}"
+        uses: The-PR-Agent/pr-agent@main
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_improve: "false"
