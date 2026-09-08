@@ -14,6 +14,7 @@ Conocimiento operativo que Hermes carga para entender y controlar el proyecto.
 | `drive_rules.md` | Reglas de movimiento seguro. |
 | `hermes-v18-bugs.md` | Problemas conocidos de Hermes v0.18. |
 | `ros2_topics.md` | Referencia de topics ROS2. |
+| `tests/` | Tests de contrato de skills (p. ej. split de deepracer). |
 
 Las habilidades son contenido mantenible. Cachés o skills instaladas
 automáticamente deben distinguirse antes de versionarse.
