@@ -207,13 +207,24 @@ todo mezclado. El repositorio del agente debe separarla por responsabilidad
 (siguiendo el patrón de `examples/robot-assistant` del repo **Thalor**:
 skills `motor-control`, `sensor-reader`, `live-calibration`):
 
-- [ ] `deepracer-motor-control`: secuencia drive_mode → start_stop →
-      manual_drive, watchdog, dead zone, convención de signo
-- [ ] `deepracer-calibration`: trim del servo, dead zone, mediciones en vivo
-- [ ] `deepracer-vision`: MJPEG, ArUco, detección de obstáculos
-- [ ] `deepracer-troubleshooting`: SSH/firewall/Tailscale, diagnósticos
-- [ ] Conservar el conocimiento verificado intacto (las mediciones de
-      2026-07-31 son oro; mover, no reescribir)
+- [x] `deepracer-motor-control`: secuencia drive_mode → start_stop →
+      manual_drive, watchdog, daemon, safety, explorer, LEDs, backend proxy
+      (rama `feature/skill-split`, PR pendiente de revisión)
+- [x] `deepracer-calibration`: trim del servo, dead zone, mediciones en vivo,
+      speeds 2026-07-31, direction test + `#1 Pitfall` completo
+- [x] `deepracer-vision`: MJPEG, ArUco (`actividad-aruco.md`), detección de
+      obstáculos (gray-floor fix), LiDAR (sin hardware), verificación cámara
+- [x] `deepracer-troubleshooting`: SSH/firewall/Tailscale, dashboards, ROS2
+      topics, auditoría hardware, checklist post-reboot, issues; ESP32 como
+      apéndice legacy etiquetado (descartado 2026-09-05, no invertir)
+- [x] Conservar el conocimiento verificado intacto (las mediciones de
+      2026-07-31 son oro; mover, no reescribir) — verificado por auditoría
+      automatizada: 0 líneas de contenido perdidas (solo headers renombrados,
+      rutas `../deepracer-control/` y punteros entre skills)
+- `deepracer-control/SKILL.md` queda como router (v3.0.0) a las 4 skills;
+  `references/`, `scripts/`, `templates/` siguen en su lugar para no romper
+  `skill_view()` existentes (HANDOFF). Dead zone vive en calibration (motor
+  la referencia, no duplica).
 
 ### Fase 8 — Gobernanza del repo (varias personas operan este proyecto)
 
