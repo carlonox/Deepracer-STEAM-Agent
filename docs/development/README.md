@@ -7,3 +7,4 @@ Registros de migración, decisiones técnicas y recopilaciones del trabajo.
 | `migracion-hermes-v018.md` | Bitácora de migración Hermes v0.16 → v0.18 (rutas del texto = estado antiguo). |
 | `recopilacion-2026-1.md` | Recopilación del trabajo del semestre 2026-1. |
 | `plantilla-README-componente.md` | Plantilla obligatoria para README de componente. |
+| `pr-reviewer.md` | Revisor propio de PRs (PR-Agent + OpenRouter, $0): setup, secreto, Pro, MCP/skills en Actions y futuro swarm. |
