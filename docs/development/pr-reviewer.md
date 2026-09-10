@@ -87,7 +87,7 @@ que este PC, todo con software libre:
 ## Stack de modelos (2026-09-10, verificado por benchmark)
 
 Benchmark offline: 5 casos históricos (gamepad NO-BUG, proxy BUG, throttle BUG,
-xr-alpha BUG, secret-env NO-BUG) × 13 modelos `:free`.
+xr-alpha BUG, secret-env NO-BUG) × 10 modelos `:free`.
 
 | Modelo | Score | Nota |
 |---|---|---|

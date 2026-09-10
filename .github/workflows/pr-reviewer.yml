@@ -53,14 +53,20 @@ jobs:
           config.response_language: "es"
           pr_reviewer.extra_instructions: |
             Prioriza SIEMPRE estas reglas del repo Deepracer-STEAM-Agent:
-            1. Canal fisico SOLO por backend Node (apps/backend :5002).
-            2. Nada de /api/start, /api/manual_drive ni scripts de manejo como prueba automatica.
-            3. Cero secretos nuevos (.env, tokens, claves, state.db, certs).
-            4. Conventional Commits 1.0.0 en titulos (type(scope): imperativo, 72 chars max).
-            5. Docs e indices van en la misma unidad de cambio.
-            6. Responde en espanol, conciso, con archivo:linea.
-            7. En XR inmersiva los gatillos son buttons[0]/[1] (inputSource.gamepad); el mapeo STANDARD 6=LT/7=RT solo vale FUERA de XR (navigator.getGamepads).
-            8. Veredicto primero con archivo:linea y cita del diff; nada de alertas genericas sin evidencia en el cambio.
+            1. Canal físico SOLO por backend Node (apps/backend :5002). Marca Major todo
+               cambio que mueva el vehículo por SSH, ROS directo o página web del robot.
+            2. Nada de /api/start, /api/manual_drive ni scripts de manejo como prueba
+               automática. Los tests físicos exigen autorización, operador y zona despejada.
+            3. Cero secretos nuevos (.env, tokens, claves, state.db, certs). Si el diff los
+               trae, es bloqueante aunque gitleaks no lo marque.
+            4. Conventional Commits 1.0.0 en títulos (type(scope): imperativo, ≤72 chars).
+            5. Docs e índices van en la misma unidad de cambio (código + skills + README).
+            6. Responde en español, conciso, con archivo:línea.
+            7. En XR inmersiva los gatillos son buttons[0]/[1] (inputSource.gamepad); el
+               mapeo STANDARD 6=LT/7=RT solo vale FUERA de XR (navigator.getGamepads).
+               No marques el fallback como bug por esa diferencia.
+            8. Veredicto primero (Major/Minor/No issue) con archivo:línea y cita del diff.
+               Prohibidos los sermones genéricos de seguridad sin evidencia en el cambio.
           # Sin esto PR-Agent rechaza IDs que no trae en su tabla MAX_TOKENS.
           config.custom_model_max_tokens: "200000"
           config.max_model_tokens: "200000"
