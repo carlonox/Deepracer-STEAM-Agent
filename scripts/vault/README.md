@@ -50,6 +50,28 @@ Remove-Item secrets.local.env                        # borra el plano
 .\scripts\vault\install-watcher.ps1                   # auto-lock al extraer la USB
 ```
 
+## Ver un secreto (p. ej. la del dashboard)
+
+La password del dashboard de Hermes es `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD`
+(usuario `admin`). Para verla:
+
+```powershell
+# opción directa: desbloquear y leer del entorno
+.\scripts\vault\unlock-vault.ps1
+$env:HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+
+# o en un paso
+.\scripts\vault\show-secret.ps1 -Name HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+```
+
+Otros nombres útiles: `DEEPRACER_API_PASSWORD`, `DEEPRACER_SSH_PASSWORD`,
+`OPENCODE_API_KEY`, `OPENCODE_GO_API_KEY`, `API_SERVER_KEY`,
+`ESP32_CAMERA_WIFI_PASSWORD`.
+
+Truco para no memorizarla: la primera vez guarda `admin` + esa password en el
+**gestor de contraseñas del navegador**; luego `localhost:9999` se rellena solo.
+Cierra la consola al terminar (queda con los secretos en el entorno).
+
 ## Hermes (Docker)
 
 Hermes usa el `.env` de la raíz vía `env_file`. Como los secretos ya no viven
