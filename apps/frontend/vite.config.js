@@ -12,9 +12,12 @@ export default defineConfig(({ mode }) => {
     keyPath && certPath && fs.existsSync(keyPath) && fs.existsSync(certPath)
       ? { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }
       : undefined;
-  // Proxy dev: con VITE_API_PROXY=1 el frontend llama a /api y /video en
-  // mismo origen (evita mixed-content bajo HTTPS). Sin flag, todo igual.
+  // Proxy dev OPT-IN: solo con VITE_API_PROXY=1 se registra server.proxy.
+  // Con host 0.0.0.0 cualquier cliente LAN puede usar /api y /video via
+  // Vite, asi que el proxy no se expone por defecto. Sin flag, todo igual
+  // (frontend ataca directo al backend y a la camara).
   const awsHost = env.VITE_AWS_HOST || "localhost";
+  const useProxy = env.VITE_API_PROXY === "1";
 
   return {
     plugins: [react()],
@@ -23,14 +26,16 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0', // Permitir conexiones desde cualquier IP
       port: 5173,
       https,
-      proxy: {
-        "/api": "http://127.0.0.1:5002",
-        "/video": {
-          target: `http://${awsHost}:8080`,
-          changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/video/, ""),
+      ...(useProxy ? {
+        proxy: {
+          "/api": "http://127.0.0.1:5002",
+          "/video": {
+            target: `http://${awsHost}:8080`,
+            changeOrigin: true,
+            rewrite: (p) => p.replace(/^\/video/, ""),
+          },
         },
-      },
+      } : {}),
       hmr: {
         clientPort: 8081, // HMR a través de Nginx en puerto 8081
       }

@@ -15,13 +15,20 @@ const USE_PROXY = import.meta.env.VITE_API_PROXY === "1";
  * Anti-lag (red saturada del aula): los acelerones son lossy con
  * latest-wins y un solo vuelo a la vez; el STOP es prioritario
  * (aborta lo en vuelo, vacía la cola y reintenta hasta ACK).
+ * Pending-stop guard: mientras haya un stop en curso los throttles
+ * encolados se descartan (el robot no debe reanudar marcha antes del ACK).
+ * Contador, no boolean: VR/dead-man/gamepad programan varios stops
+ * concurrentes y un boolean se limpiaria demasiado pronto.
  * @param {string} path - API endpoint path
  * @param {object} body - Request body
- * @returns {Promise<object|null>} Response data or null on error
+ * @returns {Promise<object|null>} Response data; null si el comando fue
+ * superseded por uno mas nuevo (latest-wins, no es error). Rechaza si el
+ * POST falla o si habia un stop en curso.
  */
 let flightCtrl = null;
 let queuedThrottle = null;
 let pumping = false;
+let pendingStops = 0;
 const FETCH_TIMEOUT_MS = 1500;
 const STOP_RETRIES = 8;
 const STOP_RETRY_MS = 150;
@@ -54,14 +61,24 @@ async function pumpThrottles() {
   pumping = true;
   try {
     while (queuedThrottle) {
+      // Stop en curso: descartar, nunca enviar (ver pendingStops).
+      if (pendingStops > 0) {
+        const dropped = queuedThrottle;
+        queuedThrottle = null;
+        dropped.reject(new Error("throttle descartado: stop en curso"));
+        continue;
+      }
       const job = queuedThrottle;
       queuedThrottle = null;
       flightCtrl = new AbortController();
       const ts = timeoutSignal(FETCH_TIMEOUT_MS, flightCtrl.signal);
       try {
-        await postRaw(job.url, job.body, ts.signal);
+        const data = await postRaw(job.url, job.body, ts.signal);
+        job.resolve(data);
       } catch (err) {
-        if (err?.name !== "AbortError") console.error("API error:", err);
+        // AbortError = el stop mato este vuelo (superseded, no es error).
+        if (err?.name === "AbortError") job.resolve(null);
+        else { console.error("API error:", err); job.reject(err); }
       } finally {
         ts.done();
         flightCtrl = null;
@@ -91,8 +108,14 @@ export const apiPost = async (path, body = {}) => {
 
     if (isStopLike(path, body)) {
       // El stop salta la cola: aborta, vacía y reintenta hasta ACK.
+      pendingStops += 1;
+      try {
       try { flightCtrl?.abort(); } catch { /* noop */ }
-      queuedThrottle = null;
+      if (queuedThrottle) {
+        // Superseded por el stop: resolver, no rechazar (operacion normal).
+        queuedThrottle.resolve(null);
+        queuedThrottle = null;
+      }
       let lastErr = new Error("stop no confirmado");
       for (let i = 0; i < STOP_RETRIES; i++) {
         const ts = timeoutSignal(FETCH_TIMEOUT_MS);
@@ -107,6 +130,9 @@ export const apiPost = async (path, body = {}) => {
         }
       }
       throw lastErr;
+      } finally {
+        pendingStops -= 1;
+      }
     }
 
     if (body.init || path === "start") {
@@ -118,10 +144,24 @@ export const apiPost = async (path, body = {}) => {
       }
     }
 
-    // Acelerón: latest-wins, fire-and-forget (el pump manda de a uno).
-    queuedThrottle = { url, body };
+    // Acelerón: latest-wins, un solo vuelo a la vez. El comando anterior
+    // sin enviar se supera (resuelve null, no es error: pasa a cada rato
+    // manejando). Si hay stop en curso se rechaza: el caller debe saber
+    // que no se movio nada.
+    if (pendingStops > 0) {
+      throw new Error("throttle descartado: stop en curso");
+    }
+    if (queuedThrottle) {
+      queuedThrottle.resolve(null);
+    }
+    let resolveJob, rejectJob;
+    const gate = new Promise((resolve, reject) => {
+      resolveJob = resolve;
+      rejectJob = reject;
+    });
+    queuedThrottle = { url, body, resolve: resolveJob, reject: rejectJob };
     pumpThrottles();
-    return null;
+    return gate;
   } catch (err) {
     console.error("API error:", err);
     throw err;
