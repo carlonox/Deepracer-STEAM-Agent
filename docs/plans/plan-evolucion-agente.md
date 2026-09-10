@@ -168,6 +168,11 @@ Actualizarlo para que refleje la visión de la sección 3:
 - [ ] **Cuerpo**: cámara monocular única percepción; batería LiPo monitoreada;
       LED trasero de estado; sin IMU/LiDAR
 
+> **Mecanismo (2026-09-10):** Hermes lee `HERMES_HOME/SOUL.md`
+> (`/opt/data/SOUL.md`), no `soul/soul.md`. El `docker-compose.yml` monta
+> `hermes/soul/soul.md` **read-only** sobre `/opt/data/SOUL.md`, así el SOUL
+> curado es el que corre. `hermes/SOUL.md` (runtime) está en `.gitignore`.
+
 ### Fase 3 — Memoria del agente (Mnemosyne, ligera y curada)
 
 El agente usa hoy `hermes/memories/MEMORY.md` (texto plano con secciones

@@ -15,6 +15,9 @@ services:
       - "8642:8642"
     volumes:
       - ./hermes:/opt/data
+      # SOUL curado = fuente de verdad; montado read-only sobre el de runtime
+      # (HERMES_HOME/SOUL.md) para que Hermes siempre use soul/soul.md.
+      - ./hermes/soul/soul.md:/opt/data/SOUL.md:ro
       - ./:/workspace
     working_dir: /workspace
     env_file:

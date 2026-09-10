@@ -9,6 +9,8 @@ hermes/.env
 hermes/.env.*
 hermes/auth.json
 hermes/auth.lock
+# SOUL de runtime: se monta desde hermes/soul/soul.md (no versionar el generado)
+hermes/SOUL.md
 
 # === VAULT LOCAL (Opcion B: USB keyfile + PIN) ===
 secrets.age
