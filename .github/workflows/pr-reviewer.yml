@@ -48,8 +48,8 @@ jobs:
           # Bootstrap: .pr_agent.toml solo se lee desde main (tras el merge).
           # Estas env cubren la primera revisión; el toml manda después.
           # Stack pinnado por benchmark offline (2026-09-10). Espejo del toml.
-          config.model: "nex-agi/nex-n2.5-pro:free"
-          config.fallback_models: '["nvidia/nemotron-3-super-120b-a12b:free", "cohere/north-mini-code:free", "openrouter/free"]'
+          config.model: "openrouter/nex-agi/nex-n2.5-pro:free"
+          config.fallback_models: '["openrouter/nvidia/nemotron-3-super-120b-a12b:free", "openrouter/cohere/north-mini-code:free", "openrouter/openrouter/free"]'
           config.response_language: "es"
           pr_reviewer.extra_instructions: |
             Prioriza SIEMPRE estas reglas del repo Deepracer-STEAM-Agent:
@@ -63,6 +63,7 @@ jobs:
             8. Veredicto primero con archivo:linea y cita del diff; nada de alertas genericas sin evidencia en el cambio.
           # Sin esto PR-Agent rechaza IDs que no trae en su tabla MAX_TOKENS.
           config.custom_model_max_tokens: "200000"
+          config.max_model_tokens: "200000"
           github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "false"

@@ -6,10 +6,11 @@
 # Stack pinnado por benchmark offline (2026-09-10, 5 casos historicos x 13 modelos).
 # Primario nex-pro 4/4; secundarios super-120b 4/5 y north-mini 3/4; router gratis
 # al final como red de seguridad (nunca primero: es no-deterministico).
-model = "nex-agi/nex-n2.5-pro:free"
-fallback_models = ["nvidia/nemotron-3-super-120b-a12b:free", "cohere/north-mini-code:free", "openrouter/free"]
+model = "openrouter/nex-agi/nex-n2.5-pro:free"
+fallback_models = ["openrouter/nvidia/nemotron-3-super-120b-a12b:free", "openrouter/cohere/north-mini-code:free", "openrouter/openrouter/free"]
 # Obligatorio para IDs fuera de la tabla MAX_TOKENS de PR-Agent.
 custom_model_max_tokens = 200000
+max_model_tokens = 200000
 response_language = "es"
 
 [pr_reviewer]
