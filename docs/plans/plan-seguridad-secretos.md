@@ -100,11 +100,11 @@ dos partes no se abre nada. Nunca hay `.env` en texto plano en disco.
 - **Generar (una vez, en máquina confiable):** secreto aleatorio 32 bytes
   → QR impreso/laminado → cada uno de los 4 lo guarda en su celu (NO
   pegado en la pared). Con `PIN + secreto_QR` se cifra el vault inicial.
-- **Abrir (cada jornada):** correr `scripts/unlock-vault.ps1` → pide el
+- **Abrir (cada jornada):** correr `scripts/vault/unlock-vault.ps1` → pide el
   PIN + escanear el QR con la webcam (OpenCV + pyzbar) o pegarlo a mano
   → descifra a RAM, inyecta env vars y arranca el backend. Nada queda
   en disco.
-- **Cerrar:** `scripts/lock-vault.ps1` mata el backend y limpia las vars.
+- **Cerrar:** `scripts/vault/lock-vault.ps1` mata el backend y limpia las vars.
   Se dispara solo al bloquear Windows, tras X horas, o manual.
 - **Si se filtra:** una FOTO del QR sola no alcanza (falta el PIN). Si
   alguien sale del equipo se regenera QR + PIN y se re-cifra (5 min).
@@ -114,6 +114,10 @@ dos partes no se abre nada. Nunca hay `.env` en texto plano en disco.
 
 ## 8. Opción B — Vault local + USB keyfile (auto-detect, ~$5)
 
+> **Estado: implementada** en `scripts/vault/` (2026-09-10, con `age` +
+> `age-plugin-batchpass`; ver `scripts/vault/README.md`). Falta probarla en el
+> PC de la U con las cuentas Windows/BitLocker del pre-requisito.
+
 **Idea:** igual que la Opción A, pero la mitad física vive en una USB
 (`keyfile` de 64 bytes aleatorios) en vez de un QR. Windows SÍ detecta
 la USB sola, así que el desbloqueo/bloqueo puede ser automático.
@@ -121,11 +125,17 @@ la USB sola, así que el desbloqueo/bloqueo puede ser automático.
 - **Generar:** `keyfile` aleatorio en la USB (identificada por su Volume
   Serial, no por letra `E:`/`F:`) + PIN del equipo → cifran `secrets.age`.
   Una USB por equipo (o una por persona si quieren revocación individual).
-- **Abrir:** al insertar la USB, un watcher PowerShell (evento WMI
-  `Win32_VolumeChangeEvent` o tarea programada) corre `unlock-usb.ps1` →
-  pide el PIN → verifica el `keyfile` → descifra a RAM y levanta el backend.
-- **Cerrar:** al EXTRAER la USB el mismo watcher corre `lock-usb.ps1` →
-  mata backend + limpia env vars. Sin USB puesta no hay credenciales vivas.
+  Implementado en `scripts/vault/init-vault.ps1`.
+- **Abrir:** `scripts/vault/unlock-vault.ps1 -StartBackend` verifica la USB por
+  serial, pide el PIN, descifra a RAM y levanta el backend con las variables
+  inyectadas. Un watcher (`scripts/vault/watch-vault.ps1`, tarea programada con
+  `install-watcher.ps1`) avisa por log al insertar la USB: el PIN exige consola,
+  así que el desbloqueo es manual (no hay prompt en un watcher de fondo).
+- **Cerrar:** al EXTRAER la USB el watcher corre `scripts/vault/lock-vault.ps1`
+  → mata el backend del vault (las credenciales viven solo en la memoria de ese
+  proceso y mueren con él). Cerrá también la consola que corrió el unlock: el
+  proceso PowerShell que lo ejecutó conserva las variables en su entorno. Sin
+  USB puesta no hay credenciales vivas.
 - **Si se pierde/roba:** la USB sola no alcanza (falta el PIN). Se revoca
   re-cifrando con un `keyfile` nuevo. Una USB se puede copiar igual que un
   QR, por eso el PIN es obligatorio en ambas opciones.
