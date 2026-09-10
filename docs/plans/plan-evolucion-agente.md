@@ -31,7 +31,7 @@ físico del aula**. Su memoria debe ser ligera y curada, no un archivo infinito.
 
 ---
 
-## 2. Estado actual (2026-09-05) — ya hecho, no repetir
+## 2. Estado actual (actualizado 2026-09-10) — ya hecho, no repetir
 
 | Área | Estado |
 |---|---|
