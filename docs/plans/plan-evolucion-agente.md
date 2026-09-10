@@ -133,6 +133,22 @@ vieja.
 > Si el upgrade rompe algo, el bundle de respaldo permite volver atrás.
 > No actualizar el robot real hasta que el stack completo pase la Fase 0.
 
+**Hallazgos del salto a la última imagen (2026-09-10, `nousresearch/hermes-agent:latest`):**
+
+- **Auth del dashboard cambió.** La env `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD`
+  ya no se usa para el gate: la imagen nueva exige
+  `dashboard.basic_auth.username` + `password_hash` en `hermes/config.yaml`
+  (hash con `from plugins.dashboard_auth.basic import hash_password`). Sin eso
+  el gateway se niega a bindear a `0.0.0.0` ("no auth providers registered").
+- **`reasoning_effort: ultra` ya no existe** (avisa y cae a `medium`). Válidos:
+  `none/low/medium/high` (+`xhigh/max` en algunos providers).
+- **DeepSeek + `opencode-go`**: el `reasoning_effort` no se pasa como kwarg de
+  API (issue #21577 de `NousResearch/hermes-agent`); puede no tener efecto.
+- **Secretos**: Hermes consume el `.env` raíz por `env_file`; al mover los
+  secretos al vault (ver `docs/plans/plan-seguridad-secretos.md`), hay que
+  inyectarlos con `${VAR}` en `docker-compose.yml` y arrancar desde consola
+  desbloqueada.
+
 ### Fase 2 — Actualizar el SOUL del agente (`hermes/soul/soul.md`)
 
 El SOUL actual (32 líneas) es funcional pero está desactualizado y es plano.
@@ -151,6 +167,11 @@ Actualizarlo para que refleje la visión de la sección 3:
       nombrar la fuente cuando sea posible
 - [ ] **Cuerpo**: cámara monocular única percepción; batería LiPo monitoreada;
       LED trasero de estado; sin IMU/LiDAR
+
+> **Mecanismo (2026-09-10):** Hermes lee `HERMES_HOME/SOUL.md`
+> (`/opt/data/SOUL.md`), no `soul/soul.md`. El `docker-compose.yml` monta
+> `hermes/soul/soul.md` **read-only** sobre `/opt/data/SOUL.md`, así el SOUL
+> curado es el que corre. `hermes/SOUL.md` (runtime) está en `.gitignore`.
 
 ### Fase 3 — Memoria del agente (Mnemosyne, ligera y curada)
 
