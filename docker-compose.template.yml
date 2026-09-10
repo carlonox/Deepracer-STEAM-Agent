@@ -1,5 +1,7 @@
 # Deepracer STEAM Agent - Docker Compose Template
-# COPIA como docker-compose.yml y rellena los valores
+# COPIA como docker-compose.yml. Los secretos NO van aquí ni en .env: viven en
+# el vault (scripts/vault). Arranca Hermes desde una consola desbloqueada
+# (.\scripts\vault\unlock-vault.ps1) para que ${...} resuelva los secretos.
 
 services:
   hermes:
@@ -16,9 +18,16 @@ services:
       - ./:/workspace
     working_dir: /workspace
     env_file:
-      - .env
+      - .env            # solo config (sin secretos)
     environment:
       TERM: xterm-256color
       HERMES_DASHBOARD: "1"
       API_SERVER_ENABLED: "true"
       API_SERVER_HOST: 0.0.0.0
+      # Secretos inyectados por el vault (requieren unlock previo):
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY}
+      OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY}
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: ${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD}
+      HERMES_DASHBOARD_BASIC_AUTH_SECRET: ${HERMES_DASHBOARD_BASIC_AUTH_SECRET}
+      API_SERVER_KEY: ${API_SERVER_KEY}
+
