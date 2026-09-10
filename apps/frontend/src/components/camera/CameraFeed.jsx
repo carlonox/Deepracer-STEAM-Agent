@@ -6,8 +6,12 @@ export default function CameraFeed() {
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const AWS_HOST = import.meta.env.VITE_AWS_HOST || "localhost";
+  // Con VITE_API_PROXY=1 el MJPEG va por mismo origen (/video/...) y vite
+  // lo proxea al robot (evita mixed-content bajo HTTPS).
   const cameraUrl =
-`http://${AWS_HOST}:8080/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360`;
+    import.meta.env.VITE_API_PROXY === "1"
+      ? `/video/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85`
+      : `http://${AWS_HOST}:8080/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85`;
 
   useEffect(() => {
     const handleFullscreenChange = () => {

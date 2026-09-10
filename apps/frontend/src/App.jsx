@@ -24,12 +24,20 @@ function App() {
   const [maxSpeed, setMaxSpeed] = useState(0.5);
   const [gamepadMode, setGamepadMode] = useState('joystick');
   const [vrMode, setVrMode] = useState(false);
+  const [vrControlMode, setVrControlMode] = useState('triggers');
+  const [vrDisplay, setVrDisplay] = useState('vr'); // 'vr' = cámara stream, 'ar' = passthrough
   const [vrInput, setVrInput] = useState({ steering: 0, throttle: 0 });
   const lastSendTime = useRef(0);
   
   const { isConnected: gamepadConnected } = useGamepad(manualMode, gamepadMode, maxSpeed, setMaxSpeed);
   const { pressedKeys } = useKeyboard(true, maxSpeed); // TODO: cambiar a manualMode
-  const { leftController, rightController, startSession: startXRSession, endSession: endXRSession } = useQuestVRInput();
+  const { leftController, rightController, isSupported, supportInfo, isSessionActive, xrStatus, hudRef, startSession: startXRSession, endSession: endXRSession } = useQuestVRInput();
+  const [padCount, setPadCount] = useState(0);
+
+  // HUD dentro del casco: modo + mando actual para la sesión XR
+  useEffect(() => {
+    if (hudRef) hudRef.current = { mode: vrControlMode, display: vrDisplay, steering: vrInput.steering, throttle: vrInput.throttle };
+  }, [vrControlMode, vrDisplay, vrInput, hudRef]);
   const lastVRSent = useRef({ angle: 0, throttle: 0 });
 
   // Mouse/Pointer/Touch event logging - capture ALL event info
@@ -152,7 +160,8 @@ function App() {
   // VR Mode: Use wheel events from Meta Quest joystick to simulate keyboard
   const sendVRCommand = useCallback(async (dirX, dirY, forceStop = false) => {
     const now = Date.now();
-    if (now - lastSendTime.current < 50) return; // Throttle to 20Hz
+    // El STOP siempre pasa: un stop throttled = robot desbocado.
+    if (!forceStop && now - lastSendTime.current < 50) return; // Throttle to 20Hz
     lastSendTime.current = now;
     
     // Simulate keyboard-like controls based on joystick direction
@@ -205,32 +214,140 @@ function App() {
     }
   }, [maxSpeed]);
 
-  // VR Mode: drive from real WebXR controller state (replaces the old
-  // mouse-wheel hack, which never read the headset).
-  // Right trigger = forward (proportional), left trigger = reverse,
-  // right stick X (fallback left) = steering. Scaled to the wheel-delta
-  // convention sendVRCommand already understands.
+  // STOP con reintentos: un solo POST perdido = robot desbocado.
+  // Marca inactivo + manda stop ya + 2 refuerzos (120/350 ms).
+  const stopTimers = useRef([]);
+  const lastDriveRx = useRef(0);
+  const lastVRFwd = useRef(false); // marcha adelante vigente (para freno LT)
+  const sendVRStop = useCallback((reason) => {
+    lastVRSent.current = { active: false };
+    lastVRFwd.current = false;
+    setVrInput({ steering: 0, throttle: 0 });
+    console.log(`🥽 VR stop (${reason})`);
+    sendVRCommand(0, 0, true);
+    stopTimers.current.forEach(clearTimeout);
+    stopTimers.current = [120, 350].map((ms) =>
+      setTimeout(() => { sendManualCommand(0, 0, maxSpeed).catch(() => {}); }, ms)
+    );
+  }, [maxSpeed, sendVRCommand]);
+
+  useEffect(() => () => stopTimers.current.forEach(clearTimeout), []);
+
+  // Dead-man: si VR queda "activo" sin comandos frescos (>500 ms), parar.
+  useEffect(() => {
+    if (!vrMode) return;
+    const id = setInterval(() => {
+      if (lastVRSent.current.active && Date.now() - lastDriveRx.current > 500) {
+        sendVRStop('dead-man');
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, [vrMode, sendVRStop]);
+  // VR drive desde controles WebXR reales (reemplaza el hack de rueda).
+  // triggers: RT adelante, LT atrás, stick X gira.
+  // joystick: stick derecho manda aceleración + giro.
   useEffect(() => {
     if (!vrMode) return;
     const rt = rightController?.trigger ?? 0;
     const lt = leftController?.trigger ?? 0;
     const stickX = rightController?.stickX || leftController?.stickX || 0;
-    const active = rt >= 0.08 || lt >= 0.08 || Math.abs(stickX) >= 0.15;
-    if (!active) {
-      if (lastVRSent.current.active) {
-        lastVRSent.current = { active: false };
-        setVrInput({ steering: 0, throttle: 0 });
-        console.log('🥽 VR: controls released - sending stop');
-        sendVRCommand(0, 0, true);
+    const stickY = rightController?.stickY || leftController?.stickY || 0;
+    // Deadzone con corte real: sin esto el reposo del stick filtra ±3° fantasma.
+    const sX = Math.abs(stickX) >= 0.15 ? stickX : 0;
+    const sY = Math.abs(stickY) >= 0.15 ? stickY : 0;
+    const grip = Math.max(rightController?.grip ?? 0, leftController?.grip ?? 0);
+    const btnA = rightController?.buttonA || leftController?.buttonA || false;
+    let dirX = 0;
+    let dirY = 0;
+    let active = false;
+    let brake = false;
+    if (vrControlMode === 'joystick') {
+      // Grip o A = freno dedicado
+      brake = grip > 0.3 || btnA;
+      active = brake || Math.abs(stickX) >= 0.15 || Math.abs(stickY) >= 0.15;
+      if (!active) {
+        if (lastVRSent.current.active) sendVRStop('suelta joystick');
+        return;
       }
-      return;
+      dirX = brake ? 0 : sX * 20;
+      dirY = brake ? 0 : sY * 20;
+    } else {
+      // Arcade: RT acelera; LT con marcha adelante = freno, si no = reversa
+      const rtOn = rt >= 0.08;
+      const ltOn = lt >= 0.08;
+      brake = grip > 0.3 || btnA || (ltOn && !rtOn && lastVRFwd.current);
+      active = brake || rtOn || ltOn || Math.abs(stickX) >= 0.15;
+      if (!active) {
+        if (lastVRSent.current.active) sendVRStop('suelta gatillos');
+        return;
+      }
+      dirX = brake ? 0 : sX * 20;
+      dirY = brake ? 0 : (lt - rt) * 20;
     }
     lastVRSent.current = { active: true };
-    const dirX = stickX * 20;
-    const dirY = (lt - rt) * 20;
+    lastDriveRx.current = Date.now();
+    if (!brake) lastVRFwd.current = dirY < -12;
     setVrInput({ steering: dirX, throttle: dirY });
-    sendVRCommand(dirX, dirY);
-  }, [vrMode, leftController, rightController, sendVRCommand]);
+    if (brake) sendVRCommand(0, 0, true);
+    else sendVRCommand(dirX, dirY);
+  }, [vrMode, vrControlMode, leftController, rightController, sendVRCommand, sendVRStop]);
+
+  // VR fallback: sin sesión XR (p. ej. HTTP en LAN, sin HTTPS) el Quest
+  // expone los controles por Gamepad API. Mismo mapeo que modo Manual.
+  useEffect(() => {
+    if (!vrMode || isSessionActive) return;
+    let raf = 0;
+    const AXIS_DEAD = 0.15;
+    const TRIG_DEAD = 0.05;
+    const loop = async () => {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      let count = 0;
+      for (const p of pads) { if (p && p.connected) count++; }
+      setPadCount(count);
+      let pad = null;
+      for (const p of pads) {
+        if (p && p.connected && (p.axes.length >= 2 || p.buttons.length >= 8)) { pad = p; break; }
+      }
+      if (pad) {
+        let dirX = 0;
+        let dirY = 0;
+        let active = false;
+        let brake = false;
+        if (vrControlMode === 'joystick') {
+          const axRaw = pad.axes[0] ?? 0;
+          const ayRaw = pad.axes[1] ?? 0;
+          const ax = Math.abs(axRaw) >= AXIS_DEAD ? axRaw : 0;
+          const ay = Math.abs(ayRaw) >= AXIS_DEAD ? ayRaw : 0;
+          brake = pad.buttons[0]?.pressed || false; // A = freno
+          active = brake || ax !== 0 || ay !== 0;
+          if (active) { dirX = brake ? 0 : ax * 20; dirY = brake ? 0 : ay * 20; }
+        } else {
+          const rtv = pad.buttons[7]?.value ?? 0;
+          const ltv = pad.buttons[6]?.value ?? 0;
+          const axRaw = pad.axes[0] ?? 0;
+          const ax = Math.abs(axRaw) >= AXIS_DEAD ? axRaw : 0;
+          const rtOn = rtv > TRIG_DEAD;
+          const ltOn = ltv > TRIG_DEAD;
+          brake = (pad.buttons[0]?.pressed || false) || (ltOn && !rtOn && lastVRFwd.current);
+          active = brake || rtOn || ltOn || ax !== 0;
+          if (active) { dirX = brake ? 0 : ax * 20; dirY = brake ? 0 : (ltv - rtv) * 20; }
+        }
+        if (!active) {
+          if (lastVRSent.current.active) sendVRStop('suelta fallback');
+        } else {
+          lastVRSent.current = { active: true };
+          lastDriveRx.current = Date.now();
+          if (!brake) lastVRFwd.current = dirY < -12;
+          setVrInput({ steering: dirX, throttle: dirY });
+          if (brake) sendVRCommand(0, 0, true);
+          else sendVRCommand(dirX, dirY);
+        }
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [vrMode, vrControlMode, isSessionActive, sendVRCommand, sendVRStop]);
 
   // Activate VR mode (deactivates manual mode but initializes backend for manual control)
   const activateVR = async () => {
@@ -247,7 +364,7 @@ function App() {
     // Best effort: open the WebXR session so controller state flows.
     // Driving still works without it only if the browser exposes gamepads.
     try {
-      const xrOk = await startXRSession();
+      const xrOk = await startXRSession(vrDisplay);
       if (!xrOk) console.warn('🥽 WebXR session not started: triggers/sticks unavailable in VR mode');
     } catch (error) {
       console.error('Error starting XR session:', error);
@@ -471,6 +588,53 @@ function App() {
                   </div>
                 </div>
 
+                {/* VR Control Mode */}
+                <div className="card bg-base-100 shadow-xl">
+                  <div className="card-body p-4">
+                    <h2 className="card-title text-sm mb-2">Modo VR</h2>
+                    <div className="flex gap-2">
+                      <button
+                        className={`btn btn-sm flex-1 ${vrControlMode === 'joystick' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setVrControlMode('joystick')}
+                      >
+                        Joystick
+                      </button>
+                      <button
+                        className={`btn btn-sm flex-1 ${vrControlMode === 'triggers' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setVrControlMode('triggers')}
+                      >
+                        Gatillos
+                      </button>
+                    </div>
+                    <p className="text-xs opacity-70 mt-2">
+                      {vrControlMode === 'joystick'
+                        ? 'Stick: arriba = adelante, X = giro · Grip/A = freno'
+                        : 'RT = acelera · LT = frena/reversa · stick = giro · Grip/A = freno'}
+                      {!isSessionActive && ' (sin sesion XR: via Gamepad API)'}
+                    </p>
+                    <h2 className="card-title text-sm mb-2 mt-3">Vista</h2>
+                    <div className="flex gap-2">
+                      <button
+                        className={`btn btn-sm flex-1 ${vrDisplay === 'vr' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setVrDisplay('vr')}
+                      >
+                        VR cámara
+                      </button>
+                      <button
+                        className={`btn btn-sm flex-1 ${vrDisplay === 'ar' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setVrDisplay('ar')}
+                        disabled={supportInfo && !supportInfo.immersiveAR && supportInfo.hasNavigatorXR}
+                        title={supportInfo?.immersiveAR ? 'Passthrough: ves el cuarto directo' : 'Este navegador no anuncia AR'}
+                      >
+                        AR real
+                      </button>
+                    </div>
+                    <p className="text-xs opacity-70 mt-2">
+                      AR = ves el cuarto y el robot directo (cero lag, nitidez total) + HUD flotante.
+                    </p>
+                  </div>
+                </div>
+
                 {/* VR Joystick Status */}
                 <div className="card bg-base-100 shadow-xl">
                   <div className="card-body p-4">
@@ -478,7 +642,7 @@ function App() {
                       <Glasses className="w-4 h-4" />
                       Modo VR Activo
                     </h2>
-                    <p className="text-sm opacity-70 mb-3">Usa el joystick del Meta Quest para controlar</p>
+                    <p className="text-sm opacity-70 mb-3">Usa los controles del Meta Quest para conducir</p>
                     
                     {/* Visual joystick indicator */}
                     <div className="flex items-center justify-center gap-4">
@@ -506,6 +670,13 @@ function App() {
                           </span>
                         </div>
                       </div>
+                    </div>
+                    {/* Diagnóstico visible en casco (sin F12) */}
+                    <div className="font-mono text-xs mt-3 space-y-1 border-t border-base-300 pt-2">
+                      <div>Seguro: {window.isSecureContext ? 'sí' : 'NO (http)'} · XR: {supportInfo.hasNavigatorXR ? 'sí' : 'no'} · inmersivo: {supportInfo.immersiveVR ? 'sí' : 'no'} · sesión: {isSessionActive ? 'activa' : 'no'} · pads: {padCount}</div>
+                      <div>XR: {xrStatus}</div>
+                      <div>L trg={ (leftController?.trigger ?? 0).toFixed(2)} stk=({(leftController?.stickX ?? 0).toFixed(2)},{(leftController?.stickY ?? 0).toFixed(2)}) · R trg={(rightController?.trigger ?? 0).toFixed(2)} stk=({(rightController?.stickX ?? 0).toFixed(2)},{(rightController?.stickY ?? 0).toFixed(2)})</div>
+                      {isSupported === false && <div className="text-warning">Sin WebXR inmersivo: aprieta gatillos y mira si cambian trg/pads arriba.</div>}
                     </div>
                   </div>
                 </div>
