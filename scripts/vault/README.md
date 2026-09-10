@@ -55,14 +55,25 @@ Remove-Item secrets.local.env                        # borra el plano
 Una ventana nativa (WinForms) para todo lo anterior sin teclear comandos:
 doble clic en `scripts\vault\abrir-gui.cmd` (o `powershell -ExecutionPolicy Bypass -File scripts\vault\DeepRacerVaultGui.ps1`).
 
-- **Desbloquear** con tu USB + PIN: lista los secretos en memoria.
-- Selecciona uno y **Ver/Copiar** (la del dashboard, la del robot, etc.).
+- **Indicadores de estado** (arriba): USB, Vault, Backend `:5002`, Hermes `:9999`
+  con semáforo; avisa en el log si el backend se cae o deja de escuchar.
+- **Desbloquear** con tu USB + PIN: lista los secretos en memoria; **Ver/Copiar**.
 - Botones: **Iniciar/Detener backend**, **Iniciar/Detener Hermes**,
-  **Abrir dashboard**, **Bloquear** (saca los secretos de memoria y del entorno).
-- Para iniciar Hermes, los secretos van en el entorno del proceso de la GUI: por
-  eso Hermes y el backend se lanzan **desde la GUI ya desbloqueada**.
+  **Abrir dashboard**, **Bloquear** (saca secretos de memoria y entorno).
+- **Visor de logs**: desplegable GUI / Backend / Hermes, con refresco automático.
+  El backend redirige su salida a `%LOCALAPPDATA%\DeepRacerVault\backend.*.log`.
 
-> Requiere PowerShell de Windows (WinForms). Nada de dependencias extra.
+### Ejecutable (.exe)
+
+Para no depender de abrir PowerShell:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\vault\build-gui-exe.ps1
+# genera scripts\vault\DeepRacerVault.exe
+```
+Usa `ps2exe` (se instala en tu perfil si falta). El `.exe` **no se versiona** y
+necesita los `.ps1` del vault junto a él (los dot-source).
+
+> Requiere PowerShell de Windows (WinForms) y, para Hermes/backend, Docker/node.
 
 ## Ver un secreto (p. ej. la del dashboard)
 

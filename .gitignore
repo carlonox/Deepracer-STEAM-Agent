@@ -17,6 +17,8 @@ keyfile.bin
 *.keyfile
 secrets.local.env
 **/DeepRacerVault/
+# Binario generado por build-gui-exe.ps1 (no versionar)
+scripts/vault/*.exe
 
 # === DOCKER COMPOSE (tiene API keys) ===
 docker-compose.yml
