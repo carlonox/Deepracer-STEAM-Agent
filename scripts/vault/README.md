@@ -50,6 +50,33 @@ Remove-Item secrets.local.env                        # borra el plano
 .\scripts\vault\install-watcher.ps1                   # auto-lock al extraer la USB
 ```
 
+## Hermes (Docker)
+
+Hermes usa el `.env` de la raíz vía `env_file`. Como los secretos ya no viven
+ahí, se los pasa el vault por interpolación de shell. Con esta parte en
+`docker-compose.yml`:
+
+```yaml
+    env_file:
+      - .env            # solo config
+    environment:
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY}
+      OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY}
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: ${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD}
+      HERMES_DASHBOARD_BASIC_AUTH_SECRET: ${HERMES_DASHBOARD_BASIC_AUTH_SECRET}
+      API_SERVER_KEY: ${API_SERVER_KEY}
+```
+
+Arranca Hermes **desde una consola desbloqueada** (si no, `${...}` queda vacío):
+
+```powershell
+.\scripts\vault\unlock-vault.ps1     # setea los secretos en el shell
+docker compose up -d
+```
+
+> `hermes/config.yaml` y `hermes/auth.json` tienen secretos propios del agent
+> (estado persistente); eso es aparte del vault y no se inyecta por env.
+
 ## Agregar / revocar personas
 
 ```powershell
