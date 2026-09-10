@@ -45,6 +45,12 @@ origen y vite los proxea al backend (`127.0.0.1:5002`) y a la cámara del
 robot: sin esto la página HTTPS bloquearía backend y cámara
 (mixed-content).
 
+> **El proxy exige HTTPS válido.** `VITE_API_PROXY=1` solo se activa si
+> `VITE_HTTPS_KEY` y `VITE_HTTPS_CERT` existen y son legibles; si faltan,
+> vite arranca en HTTP e **ignora el flag** con un warning (no se sirve
+> control por LAN en claro). Para que el proxy funcione hay que completar
+> los 3 pasos de arriba, no basta el flag.
+
 ### Sin certificado no se rompe nada
 
 Si las variables no existen o los archivos no están, `vite.config.js`
