@@ -50,6 +50,20 @@ Remove-Item secrets.local.env                        # borra el plano
 .\scripts\vault\install-watcher.ps1                   # auto-lock al extraer la USB
 ```
 
+## GUI local (sin web)
+
+Una ventana nativa (WinForms) para todo lo anterior sin teclear comandos:
+doble clic en `scripts\vault\abrir-gui.cmd` (o `powershell -ExecutionPolicy Bypass -File scripts\vault\DeepRacerVaultGui.ps1`).
+
+- **Desbloquear** con tu USB + PIN: lista los secretos en memoria.
+- Selecciona uno y **Ver/Copiar** (la del dashboard, la del robot, etc.).
+- Botones: **Iniciar/Detener backend**, **Iniciar/Detener Hermes**,
+  **Abrir dashboard**, **Bloquear** (saca los secretos de memoria y del entorno).
+- Para iniciar Hermes, los secretos van en el entorno del proceso de la GUI: por
+  eso Hermes y el backend se lanzan **desde la GUI ya desbloqueada**.
+
+> Requiere PowerShell de Windows (WinForms). Nada de dependencias extra.
+
 ## Ver un secreto (p. ej. la del dashboard)
 
 La password del dashboard de Hermes es `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD`
