@@ -31,7 +31,7 @@ físico del aula**. Su memoria debe ser ligera y curada, no un archivo infinito.
 
 ---
 
-## 2. Estado actual (2026-09-05) — ya hecho, no repetir
+## 2. Estado actual (actualizado 2026-09-10) — ya hecho, no repetir
 
 | Área | Estado |
 |---|---|
@@ -39,7 +39,7 @@ físico del aula**. Su memoria debe ser ligera y curada, no un archivo infinito.
 | **CI** | ✅ `ci.yml`: node --check, pytest (Python 3.13 — numpy 2.5.1 lo exige), build+lint del frontend. |
 | **Simulador** | ✅ `apps/simulator/` — mock fiel de la API web del DeepRacer (login CSRF, watchdog 200ms, dead zone, servo sensible, MJPEG). 19 tests de contrato. **Puede correr SIN el robot y SIN opencv.** |
 | **Docs** | `docs/archive/SpeedRacerv.2/` (iteración anterior) se **conserva tal cual** — decisión explícita de Carlos. No mover, no borrar. |
-| **ESP32** | ❌ **Descartado por Carlos**: el sensor de sonido solo detectaba choques y no aportaba. No invertir más tiempo ahí. |
+| **ESP32** | ❌ **Descartado como sensor por Carlos** (2026-09-05): el sensor de sonido solo detectaba choques y no aportaba. ⚠️ Existe un **diseño no adoptado** de teleoperación BLE (`docs/plans/bt-teleop.md`, PR #14): si se adopta, debe respetar la **regla 1** (control físico solo por `apps/backend` :5002), y ese diseño hoy plantea un bridge fuera del backend. No volver a invertir en él como sensor del agente. |
 | **Pendientes de seguridad** | Rotar password API web del robot y regenerar device token cuando haya acceso (ver `CREDENTIAL_ROTATION.md`). Los valores viejos están en BWS como `DEEPRACER_LEGACY_*`. |
 | **Commits** | ✅ Historial normalizado a Conventional Commits (19 commits, type+scope+imperativo). Skill propia: `hermes/skills/github/conventional-commits-deepracer/`. |
 | **Gobernanza** | ✅ Protección de rama `main` (PRs obligatorios + CI verde + sin push directo). Ver Fase 8. |
@@ -191,7 +191,10 @@ y `src/agente.py` (respuestas vía Ollama).
 
 Hardware verificado: cámara monocular MJPEG (`web_video_server` :8080),
 batería LiPo (I2C `0x5E`), servo/motor (I2C `0x44`), LED trasero. **NO hay**
-IMU, Ni LiDAR, Ni ESP32 (descartado).
+IMU, Ni LiDAR, Ni ESP32 como sensor (descartado 2026-09-05). El ESP32 sí
+existe en un **diseño no adoptado** de teleoperación BLE
+(`docs/plans/bt-teleop.md`) que, de adoptarse, debe sujetarse a la regla 1
+(backend :5002), no como sensor del agente.
 
 - [ ] Navegación ArUco: validar `apps/navigation/src/controlcamara.py` contra
       el stream real (marcadores impresos, focal length calibrada)
@@ -216,7 +219,8 @@ skills `motor-control`, `sensor-reader`, `live-calibration`):
       obstáculos (gray-floor fix), LiDAR (sin hardware), verificación cámara
 - [x] `deepracer-troubleshooting`: SSH/firewall/Tailscale, dashboards, ROS2
       topics, auditoría hardware, checklist post-reboot, issues; ESP32 como
-      apéndice legacy etiquetado (descartado 2026-09-05, no invertir)
+      apéndice legacy etiquetado (descartado como sensor 2026-09-05, no
+      invertir; teleop BLE como diseño no adoptado: `docs/plans/bt-teleop.md`)
 - [x] Conservar el conocimiento verificado intacto (las mediciones de
       2026-07-31 son oro; mover, no reescribir) — verificado por auditoría
       automatizada: 0 líneas de contenido perdidas (solo headers renombrados,
