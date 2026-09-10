@@ -12,12 +12,19 @@ export default defineConfig(({ mode }) => {
     keyPath && certPath && fs.existsSync(keyPath) && fs.existsSync(certPath)
       ? { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }
       : undefined;
-  // Proxy dev OPT-IN: solo con VITE_API_PROXY=1 se registra server.proxy.
-  // Con host 0.0.0.0 cualquier cliente LAN puede usar /api y /video via
-  // Vite, asi que el proxy no se expone por defecto. Sin flag, todo igual
+  // Proxy dev OPT-IN: solo con VITE_API_PROXY=1 Y https con ambas rutas
+  // se registra server.proxy. Sin certs no hay proxy: servir comandos de
+  // control por HTTP en 0.0.0.0 expondria el robot en cleartext (CWE-319).
+  // WebXR (Quest) exige contexto seguro de todos modos. Sin flag, todo igual
   // (frontend ataca directo al backend y a la camara).
   const awsHost = env.VITE_AWS_HOST || "localhost";
-  const useProxy = env.VITE_API_PROXY === "1";
+  const useProxy = env.VITE_API_PROXY === "1" && Boolean(https);
+  if (env.VITE_API_PROXY === "1" && !https) {
+    console.warn(
+      "[vite] VITE_API_PROXY=1 ignorado: faltan VITE_HTTPS_KEY/VITE_HTTPS_CERT validos. " +
+      "El proxy solo corre sobre HTTPS para no exponer control en cleartext por LAN."
+    );
+  }
 
   return {
     plugins: [react()],
