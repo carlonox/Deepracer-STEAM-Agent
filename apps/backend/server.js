@@ -176,9 +176,17 @@ app.get("/api/video_stream", async (req, res) => {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () =>
-  console.log(`Backend activo en http://0.0.0.0:${PORT}`)
-);
+// Seguridad LAN: 0.0.0.0 expone /api/* (start, manual_drive, exec) SIN
+// auth a toda la red del aula. Para Quest por LAN se usa el proxy de Vite
+// (mismo origen) y el backend puede ir a loopback con BACKEND_HOST=127.0.0.1.
+// Dejar 0.0.0.0 solo si el frontend ataca directo al backend por LAN.
+const HOST = process.env.BACKEND_HOST || "0.0.0.0";
+app.listen(PORT, HOST, () => {
+  console.log(`Backend activo en http://${HOST}:${PORT}`);
+  if (HOST === "0.0.0.0") {
+    console.warn("BACKEND_HOST=0.0.0.0: /api/* sin auth visible en LAN. Usa BACKEND_HOST=127.0.0.1 + VITE_API_PROXY=1 si el frontend va por proxy.");
+  }
+});
 
 async function handleDriveTcpCommand(command) {
   if (command.init) {

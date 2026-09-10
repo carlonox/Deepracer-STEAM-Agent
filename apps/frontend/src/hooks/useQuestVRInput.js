@@ -148,7 +148,15 @@ export default function useQuestVRInput() {
       // En AR no se carga la cámara: ves el cuarto directo (cero lag,
       // máxima nitidez) y solo flota el HUD.
       const camImg = new Image();
-      if (!isAR) camImg.src = camUrl;
+      // CORS para WebGL: texImage2D con imagen cross-origin (modo directo
+      // http://<host>:8080) exige crossOrigin + cabecera ACAO del servidor.
+      // Con proxy (/video, mismo origen) no hace falta pero no estorba.
+      // Ojo: web_video_server de ROS2 no manda ACAO -> en LAN el proxy es
+      // el fix real; esto solo evita el SECURITY_ERR cuando si hay CORS.
+      if (!isAR) {
+        camImg.crossOrigin = "anonymous";
+        camImg.src = camUrl;
+      }
       const hudCanvas = document.createElement("canvas");
       hudCanvas.width = 512;
       hudCanvas.height = 168;
@@ -165,7 +173,10 @@ export default function useQuestVRInput() {
         gl = canvas.getContext("webgl", { xrCompatible: true });
         if (!gl) throw new Error("WebGL no disponible");
         await gl.makeXRCompatible();
-        xrLayer = new XRWebGLLayer(session, gl);
+        // alpha:true: sin esto el fondo en AR es negro opaco y tapa el
+        // passthrough del Quest (solo se veria el HUD). En VR el clear
+        // opaco sigue cubriendo igual.
+        xrLayer = new XRWebGLLayer(session, gl, { alpha: true });
         session.updateRenderState({ baseLayer: xrLayer });
         texProg = initTexProgram(gl);
         quadBuf = initQuad(gl);
