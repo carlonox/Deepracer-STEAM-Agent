@@ -199,10 +199,20 @@ function Set-Led($led, $label, [string]$name, [bool]$ok, [string]$extra = '') {
 }
 $script:LastLogText = ''
 function Show-Logs {
-    switch ($script:LogSource) {
-        'Backend' { $text = (Get-Tail $backendOut) + "`r`n--- stderr ---`r`n" + (Get-Tail $backendErr 100) }
-        'Hermes'  { $text = (& docker compose -f (Join-Path $RepoRoot 'docker-compose.yml') --project-directory $RepoRoot logs --tail 200 2>&1 | Out-String) }
-        default   { $text = ($script:GuiLog -join "`r`n") }
+    try {
+        switch ($script:LogSource) {
+            'Backend' { $text = (Get-Tail $backendOut) + "`r`n--- stderr ---`r`n" + (Get-Tail $backendErr 100) }
+            'Hermes'  {
+                # docker escribe warnings a stderr; con ErrorActionPreference Stop
+                # eso aborta. Bajo Continue y capturamos todo en el texto.
+                $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+                try { $text = (& docker compose -f (Join-Path $RepoRoot 'docker-compose.yml') --project-directory $RepoRoot logs --tail 200 2>&1 | Out-String) }
+                finally { $ErrorActionPreference = $prev }
+            }
+            default   { $text = ($script:GuiLog -join "`r`n") }
+        }
+    } catch {
+        $text = "(error leyendo logs: $($_.Exception.Message))"
     }
     if ($text -eq $script:LastLogText) { return }
     $script:LastLogText = $text
@@ -246,13 +256,14 @@ $bHerm.Add_Click({
 $bHermStop.Add_Click({ try { Stop-Hermes; Add-GuiLog 'Hermes detenido.' } catch { Add-GuiLog "ERROR: $($_.Exception.Message)" }; Sync-GuiLog })
 $bDash.Add_Click({ try { Start-Process 'http://localhost:9999/login'; Add-GuiLog 'Abriendo dashboard...' } catch { Add-GuiLog "ERROR: $($_.Exception.Message)" }; Sync-GuiLog })
 $btnRefresh.Add_Click({ Show-Logs })
-$cmbLog.Add_SelectedIndexChanged({ $script:LogSource = [string]$cmbLog.SelectedItem; Show-Logs })
+$cmbLog.Add_SelectedIndexChanged({ try { $script:LogSource = [string]$cmbLog.SelectedItem; Show-Logs } catch { Add-GuiLog "ERROR logs: $($_.Exception.Message)" } })
 
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 2500
 $script:Tick = 0
 $script:UsbOk = $false
 $timer.Add_Tick({
+  try {
     $script:Tick++
     # La query CIM de la USB es lo mas caro: cada ~10s alcanza.
     if (($script:Tick % 4) -eq 1) { $script:UsbOk = [bool](Get-UsbVolume -VolumeSerial $Config.UsbVolumeSerial) }
@@ -274,6 +285,7 @@ $timer.Add_Tick({
     # La fuente Hermes llama a docker (lento): refrescala cada ~20s, no en cada tick.
     if ($script:LogSource -eq 'Hermes') { if (($script:Tick % 8) -eq 0) { Show-Logs } }
     else { Show-Logs }
+  } catch { Add-GuiLog "tick: $($_.Exception.Message)" }
 })
 $timer.Start()
 
