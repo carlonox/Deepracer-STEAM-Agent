@@ -140,6 +140,25 @@ function New-VaultIdentity {
     } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
 }
 
+function New-RawIdentity {
+    # Identidad de recuperación: NO se persiste; devuelve la llave secreta
+    # (para guardar en BWS con 2FA) y la pública. El secreto nunca toca disco.
+    $keygen = Get-AgeKeygen
+    $tmp = New-SecureTempFile
+    try {
+        if ((Invoke-Native -FilePath $keygen -Arguments @('-o', $tmp)) -ne 0) {
+            throw "age-keygen falló"
+        }
+        $pub = Invoke-Native -FilePath $keygen -Arguments @('-y', $tmp) -CaptureOutput
+        if ($pub.Code -ne 0) { throw "age-keygen -y falló" }
+        $secret = (Get-Content -LiteralPath $tmp | Where-Object { $_ -match '^AGE-SECRET-KEY-1' }) -join "`n"
+        return [pscustomobject]@{
+            PublicKey = ($pub.Output -join "`n").Trim()
+            Secret    = $secret.Trim()
+        }
+    } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+}
+
 function Get-IdentityTemp {
     # Descifra la identidad de la USB a un temp y devuelve su ruta (borrar luego).
     param(
