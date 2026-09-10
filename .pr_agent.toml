@@ -3,10 +3,11 @@
 # dashboard de OpenRouter (tier gratuito, ~1000 req/día sobra a este volumen).
 
 [config]
-# Auto-router gratis (2026-09-08): OpenRouter elige entre los :free vigentes.
-# Los IDs fijos se pudren (gemini-2.0-flash retirado, inkling solo-agentic).
-model = "openrouter/free"
-fallback_models = ["openrouter/qwen/qwen3-next-80b-a3b-instruct:free"]
+# Stack pinnado por benchmark offline (2026-09-10, 5 casos historicos x 13 modelos).
+# Primario nex-pro 4/4; secundarios super-120b 4/5 y north-mini 3/4; router gratis
+# al final como red de seguridad (nunca primero: es no-deterministico).
+model = "nex-agi/nex-n2.5-pro:free"
+fallback_models = ["nvidia/nemotron-3-super-120b-a12b:free", "cohere/north-mini-code:free", "openrouter/free"]
 # Obligatorio para IDs fuera de la tabla MAX_TOKENS de PR-Agent.
 custom_model_max_tokens = 200000
 response_language = "es"
@@ -25,7 +26,12 @@ extra_instructions = """Prioriza SIEMPRE estas reglas del repo Deepracer-STEAM-A
    trae, es bloqueante aunque gitleaks no lo marque.
 4. Conventional Commits 1.0.0 en títulos (type(scope): imperativo, ≤72 chars).
 5. Docs e índices van en la misma unidad de cambio (código + skills + README).
-6. Responde en español, conciso, con archivo:línea."""
+6. Responde en español, conciso, con archivo:línea.
+7. En XR inmersiva los gatillos son buttons[0]/[1] (inputSource.gamepad); el
+   mapeo STANDARD 6=LT/7=RT solo vale FUERA de XR (navigator.getGamepads).
+   No marques el fallback como bug por esa diferencia.
+8. Veredicto primero (Major/Minor/No issue) con archivo:línea y cita del diff.
+   Prohibidos los sermones genéricos de seguridad sin evidencia en el cambio."""
 
 [pr_description]
 generate_ai_title = false
