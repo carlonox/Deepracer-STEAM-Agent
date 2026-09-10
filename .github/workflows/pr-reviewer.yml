@@ -75,6 +75,8 @@ jobs:
           config.max_model_tokens: "200000"
           # Corte por llamada: un free colgado no debe pasar de 90s.
           config.ai_timeout: "90"
+          # Sin esto un timeout reintenta el mismo modelo y multiplica el cuelgue.
+          config.retry_same_model_on_timeout: "false"
           github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "false"

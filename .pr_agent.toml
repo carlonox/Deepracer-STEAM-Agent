@@ -15,6 +15,10 @@ response_language = "es"
 # Corte por llamada de IA (segundos). Sin esto un modelo free colgado deja
 # el job minutos en step "PR-Agent": al vencer, litellm pasa al fallback.
 ai_timeout = 90
+# Causa del cuelgue de PR #23: por defecto PR-Agent reintenta el MISMO modelo
+# tras timeout; con 4 modelos eso multiplica los minutos. Al fallar, que pase
+# directo al fallback.
+retry_same_model_on_timeout = false
 
 [pr_reviewer]
 # Reglas DEL ROBOT que el revisor genérico no conoce. Todo lo demás
