@@ -9,6 +9,11 @@ configuración mantenida por el proyecto con estado persistente de ejecución.
 |---|---|
 | `config.template.yaml` | Plantilla pública de configuración. |
 | `soul/soul.md` | Identidad y personalidad del agente (única fuente vigente; legacy en `docs/archive/SOUL-legacy-20260908.md`). |
+
+> Hermes lee el SOUL de `HERMES_HOME/SOUL.md` (`/opt/data/SOUL.md`). El
+> `docker-compose.yml` monta `soul/soul.md` **read-only** sobre esa ruta, así el
+> SOUL curado es el que usa el agente. `hermes/SOUL.md` es de runtime y no se
+> versiona (`.gitignore`).
 | `skills/` | Habilidades y referencias del DeepRacer. |
 | `scripts/` | Diagnóstico y exploración del robot. |
 | `memories/` | Memoria curada cuando se decide conservarla. |

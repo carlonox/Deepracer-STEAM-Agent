@@ -9,6 +9,18 @@ hermes/.env
 hermes/.env.*
 hermes/auth.json
 hermes/auth.lock
+# SOUL de runtime: se monta desde hermes/soul/soul.md (no versionar el generado)
+hermes/SOUL.md
+
+# === VAULT LOCAL (Opcion B: USB keyfile + PIN) ===
+secrets.age
+*.age
+keyfile.bin
+*.keyfile
+secrets.local.env
+**/DeepRacerVault/
+# Binario generado por build-gui-exe.ps1 (no versionar)
+scripts/vault/*.exe
 
 # === DOCKER COMPOSE (tiene API keys) ===
 docker-compose.yml
