@@ -251,6 +251,66 @@ opera el robot). Para que nadie "mande todo al carajo" con un push:
 > escritura. El CI verde es el segundo candado: nada rompe `main` sin que
 > los tests pasen.
 
+### Fase 9 — Versión usable para no-programadores (el que muestra el robot no es programador)
+
+Problema: hoy manejar el robot exige pedirle a una IA o a Carlos. Quienes
+muestran el robot en el aula (mecatrónica, electrónica) necesitan abrir algo
+y manejar, sin terminal, sin agentes y sin llamar a nadie.
+
+Opciones (research pendiente, ver prompt entregado a Carlos 2026-09-10):
+A. **PWA instalable** del frontend actual (costo ~0, se instala desde el
+   navegador del PC del aula, funciona offline contra el backend local).
+B. **Ejecutable Tauri** (liviano, ~10MB) o Electron (pesado, ~150MB):
+   doble-clic y anda. Más trabajo de build/release.
+C. **Frontend mejorado + lanzador**: atajo `.bat`/QR en el PC del aula que
+   abre el dashboard ya apuntando al robot. Mínimo esfuerzo, UX media.
+D. **Modo demo con simulador**: el mismo dashboard contra el mock, para
+   mostrar sin robot (ferias, clases sin hardware).
+
+Restricciones: $0, PCs Windows del aula, gates físicos intactos (autorización,
+operador, zona despejada, throttle ≤0.20), sin pedirle nada a una IA.
+Decisión y comparativa en el research; implementar la ganadora contra el
+simulador primero (regla 3 de operación).
+
+### Fase 10 — Skills de ingeniería para el agente del aula ✅ (2026-09-10)
+
+El agente del aula no tiene las skills de programación del entorno de Carlos.
+Portadas a `hermes/skills/dev/` (rama `fix/skills-dev`):
+
+| Skill | Para qué en este repo |
+|---|---|
+| `design-taste-frontend` | Que el dashboard no salga "basura": entregables visuales con estándar real |
+| `systematic-debugging` | Debug en 4 fases (entender antes de arreglar), anti-parches a ciegas |
+| `test-driven-development` | RED-GREEN-REFACTOR para lógica de control y contratos del simulador |
+| `requesting-code-review` | Auto-revisión pre-commit (scan, quality gates) antes de pedir review |
+| `plan` | Planes markdown de cambios no triviales antes de ejecutarlos |
+| `excalidraw` | Mockups y diagramas a mano para docs visuales (Fase 9 + docs) |
+
+La skill de commits ya existía (`conventional-commits-deepracer`), no se duplica.
+
+### Fase 11 — Enjambre en Oracle (revisores 24/7, $0 Always Free)
+
+El PR-Agent de GitHub Actions es single-shot sin herramientas. La evolución es
+un harness persistente en la VM Always Free (patrón Thalor expert-panel):
+workers por dominio con skills reales (las `dev/` de la Fase 10), MCP
+(github, filesystem) y colas por labels. Candidatos: reviewer profundo
+(segunda opinión tras el CI), doc-auditor (frescura de `docs/` vs realidad),
+vigía del repo (secretos, branches stales, dependencias).
+Pre-requisito: Fase "reviewer en verde" (PR #19 mergeado y probado en un PR
+real). Sin costo: solo recursos Always Free, como el resto de la infra.
+
+### Fase 12 — Documentación visual (no un reguero de .md)
+
+Audiencia: estudiantes que NO programaron el robot. Principios:
+- **Diátaxis**: tutoriales (paso a paso con fotos), guías (una tarea, una
+  página), referencia (el .md técnico actual), explicación (el porqué).
+- **Quickstart de 1 página** imprimible con QR al dashboard (Fase 9).
+- Screenshots + GIFs de cada flujo (manejar, ver cámara, parar de emergencia);
+  mockups Excalidraw versionados en el repo antes de codear UI.
+- Prohibido documentar lo no verificado (regla heredada de Fase 7).
+- Research de herramientas y comparativa encargado a IA de investigación
+  (prompt en manos de Carlos 2026-09-10).
+
 ### Fase 7 — Higiene y mantenimiento continuo
 
 - [ ] Limpiar `hermes/scripts/` de scripts de debug one-off
@@ -311,6 +371,8 @@ Fase 0 (verificar mock) → Fase 1 (entorno real + rotar credenciales)
 → Fase 1.5 (upgrade Hermes) → Fase 2 (SOUL) → Fase 3 (memoria)
 → Fase 4 (RAG) → Fase 5 (cámara) → Fase 6 (skills) → Fase 7 (higiene)
 → **Fase 8 (gobernanza — activa YA si el repo aún no tiene protección)**
+→ Fase 9 (versión usable) → Fase 10 (skills dev ✅) → Fase 11 (enjambre Oracle)
+→ Fase 12 (docs visuales)
 ```
 
 Cada fase termina con sus checks marcados y, si toca comportamiento físico,
