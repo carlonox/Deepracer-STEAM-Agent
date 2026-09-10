@@ -1,5 +1,4 @@
-# Descifra el vault y arranca el backend con los secretos inyectados.
-# Requiere la USB (identificada por serial de volumen) + el PIN.
+# Descifra el vault con TU identidad (USB + PIN) y arranca el backend.
 [CmdletBinding()]
 param(
     [switch]$StartBackend,
@@ -11,27 +10,26 @@ $Config = Get-VaultConfig
 
 $usb = Get-UsbVolume -VolumeSerial $Config.UsbVolumeSerial
 if (-not $usb) {
-    throw "USB no encontrada (serial de volumen $($Config.UsbVolumeSerial)). Sin la llave no hay vault."
+    throw "USB no encontrada (serial de volumen $($Config.UsbVolumeSerial)). Sin tu llave no hay vault."
 }
 
-$keyPath = Get-KeyfilePath -DeviceId $usb.DeviceID -RelativePath $Config.UsbKeyfileRelative
-if (-not (Test-Path -LiteralPath $keyPath)) {
-    throw "Falta el keyfile en la USB: $keyPath"
+$idPath = Get-IdentityPath -DeviceId $usb.DeviceID -Config $Config
+if (-not (Test-Path -LiteralPath $idPath)) {
+    throw "Falta tu identidad en la USB ($idPath). Corre new-identity.ps1."
 }
 
 $vaultPath = Get-VaultPath -Config $Config
 if (-not (Test-Path -LiteralPath $vaultPath)) {
-    throw "No hay vault cifrado en $vaultPath. Corre primero init-vault.ps1."
+    throw "No hay vault cifrado en $vaultPath. Corre init-vault.ps1."
 }
 
-$keyBytes = [IO.File]::ReadAllBytes($keyPath)
-$pin = Read-VaultPin -Prompt 'PIN del vault'
-$pass = Get-VaultPassphrase -KeyfileBytes $keyBytes -Pin $pin
-
+$pin = Read-VaultPin -Prompt 'PIN de tu identidad'
+$tmpId = $null
 try {
-    $text = Unprotect-VaultFile -InPath $vaultPath -Passphrase $pass
-} catch {
-    throw "No se pudo descifrar: PIN o keyfile incorrectos (o USB equivocada)."
+    $tmpId = Get-IdentityTemp -UsbIdentityPath $idPath -Pin $pin
+    $text = Unprotect-VaultWithIdentity -InPath $vaultPath -IdentityPath $tmpId
+} finally {
+    if ($tmpId) { Remove-Item -LiteralPath $tmpId -Force -ErrorAction SilentlyContinue }
 }
 
 $map = ConvertFrom-EnvText -Text $text
