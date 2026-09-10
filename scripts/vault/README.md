@@ -1,23 +1,22 @@
-# Vault local del DeepRacer (Opción B: USB keyfile + PIN)
+# Vault local del DeepRacer (una identidad por persona)
 
-Implementa la **Opción B** de `docs/plans/plan-seguridad-secretos.md` §8:
-las credenciales viven cifradas y solo se pueden descifrar con **algo que
-tenés** (una USB con un `keyfile` aleatorio) **+ algo que sabés** (un PIN).
-Sin USB no hay vault; con la USB sola tampoco (falta el PIN).
+Vault local según `docs/plans/plan-seguridad-secretos.md` §7-8. **Cada persona
+tiene su propia llave** (identidad `age` con su PIN, guardada en su USB); el
+vault `secrets.age` se cifra a la **unión de llaves públicas**. Así cada quien
+descifra con su USB+PIN, y revocar a alguien = re-cifrar sin su llave.
 
 ## Cómo funciona
 
-- **keyfile:** 64 bytes aleatorios en la USB, en `D:\DeepRacerVault\keyfile.bin`.
-  La USB se identifica por **serial de volumen** (`vault.config.psd1`), no por
-  letra, así que `D:`/`E:` pueden cambiar sin romper nada.
-- **passphrase derivada:** `Base64(HMAC-SHA256(keyfile, PIN))`. age le aplica
-  `scrypt` encima (plugin `age-plugin-batchpass`), así que una PIN corta igual
-  cuesta fuerza bruta.
-- **vault:** `%LOCALAPPDATA%\DeepRacerVault\secrets.age` (cifrado con `age`,
-  formato armor). No vive en el repo.
-- **inyección:** el backend (`apps/backend`) usa `dotenv` **sin override**, así
-  que las variables del vault ganan sobre `.env`; `unlock-vault.ps1 -StartBackend`
-  arranca `node` con esos valores solo en la memoria del proceso.
+- **Identidad (por persona):** par `age` X25519. La llave **privada** se guarda
+  cifrada con tu PIN en tu USB (`D:\DeepRacerVault\identity.age`). La **pública**
+  (`age1...`) se agrega a `%LOCALAPPDATA%\DeepRacerVault\recipients.txt`.
+- **Vault:** `%LOCALAPPDATA%\DeepRacerVault\secrets.age`, cifrado a **todos** los
+  destinatarios de `recipients.txt`. No vive en el repo.
+- **Inyección:** el backend usa `dotenv` **sin override**; `unlock-vault.ps1`
+  descifra la identidad con tu PIN y el vault con esa identidad, e inyecta las
+  variables solo en la memoria del proceso `node` que arranca.
+- La USB se identifica por **serial de volumen** (`vault.config.psd1`), no por
+  letra, así que `D:`/`E:` pueden cambiar.
 
 ## Requisitos
 
@@ -26,36 +25,54 @@ Sin USB no hay vault; con la USB sola tampoco (falta el PIN).
   BitLocker y bloqueo automático de sesión. Sin eso, ningún vault sirve.
 - PowerShell 5.1+ (viene con Windows).
 
-## Flujo
+## Alta de una persona (una vez, con SU USB)
 
 ```powershell
-# 1) Crear el vault (una vez). Te pide PIN dos veces.
-Copy-Item scripts\vault\secrets.example.env secrets.local.env   # edita valores
+.\scripts\vault\new-identity.ps1 -Label <nombre>     # pide su PIN; crea identity.age en su USB
+```
+Guarda el `age1...` que imprime. **No borres** `identity.age` de la USB: sin eso
+no se descifra nada.
+
+## Crear / actualizar el vault
+
+```powershell
+Copy-Item .env secrets.local.env                     # o el archivo con los valores
 .\scripts\vault\init-vault.ps1 -SecretsFile secrets.local.env
-Remove-Item secrets.local.env        # el plano con valores reales se borra
-
-# 2) Desbloquear + arrancar backend (cada jornada)
-.\scripts\vault\unlock-vault.ps1 -StartBackend
-
-# 3) Bloquear (mata el backend del vault)
-.\scripts\vault\lock-vault.ps1
-
-# 4) Auto-lock al sacar la USB (opcional)
-.\scripts\vault\install-watcher.ps1
+Remove-Item secrets.local.env                        # borra el plano
 ```
 
-Al **extraer** la USB, el watcher corre `lock-vault.ps1` y mata el backend.
-Al **insertarla** solo avisa por log: desbloquear exige teclado/PIN, así que se
-hace a mano con `unlock-vault.ps1`.
+## Uso diario
+
+```powershell
+.\scripts\vault\unlock-vault.ps1                     # descifra e inyecta (prueba)
+.\scripts\vault\unlock-vault.ps1 -StartBackend       # + arranca el backend
+.\scripts\vault\lock-vault.ps1                       # detiene el backend del vault
+.\scripts\vault\install-watcher.ps1                   # auto-lock al extraer la USB
+```
+
+## Agregar / revocar personas
+
+```powershell
+# Agregar: pega la llave publica (age1...) de la persona nueva.
+.\scripts\vault\add-recipient.ps1 -PublicKey age1... -Label <nombre>
+
+# Revocar: borra sus lineas de recipients.txt y re-cifra.
+# (edita el archivo y luego)
+.\scripts\vault\add-recipient.ps1 -ReencryptOnly
+```
+Re-cifrar requiere **tu** USB + PIN (usa tu identidad para abrir y volver a
+cerrar para el nuevo conjunto de llaves).
 
 ## Archivos
 
 | Archivo | Rol |
 |---|---|
-| `vault-common.ps1` | Helpers (USB por serial, KDF, proteger/descifrar). Sin secretos. |
-| `vault.config.psd1` | Serial de la USB, rutas, nombre del vault. Sin secretos. |
-| `init-vault.ps1` | Crea keyfile + cifra un `.env` local en `secrets.age`. |
-| `unlock-vault.ps1` | Descifra (USB+PIN) y arranca el backend con los secretos. |
+| `vault-common.ps1` | Helpers (USB por serial, identidades, proteger/descifrar). Sin secretos. |
+| `vault.config.psd1` | Serial de la USB, rutas, nombres. Sin secretos. |
+| `new-identity.ps1` | Crea tu identidad (USB+PIN) y te registra como destinatario. |
+| `init-vault.ps1` | Cifra un `.env` local a todos los destinatarios. |
+| `unlock-vault.ps1` | Descifra con tu USB+PIN; opcional `-StartBackend`. |
+| `add-recipient.ps1` | Agrega/remueve destinatarios y re-cifra. |
 | `lock-vault.ps1` | Detiene el backend del vault. |
 | `watch-vault.ps1` | Sondea la USB; auto-lock al extraer. |
 | `install-watcher.ps1` | Registra el watcher al iniciar sesión. |
@@ -63,14 +80,14 @@ hace a mano con `unlock-vault.ps1`.
 
 ## Límites (honestos)
 
-- La USB **se puede copiar** (igual que un QR), por eso el PIN es obligatorio.
-- El PIN se lee con `Read-Host -AsSecureString`; la passphrase derivada se pasa
-  a `age` por variable de entorno (`AGE_PASSPHRASE`), nunca por línea de
-  comandos, y se limpia al terminar. En un PC con sesión abierta, otro proceso
-  del mismo usuario podría leer el entorno: de ahí el bloqueo automático.
+- Una **copia** de `identity.age` + PIN abre el vault igual que la USB: el PIN
+  protege la identidad (scrypt de `age`), pero no hay factor físico infalible.
+- `add-recipient.ps1` conserva el vault en claro un instante en memoria al
+  re-cifrar; no deja plano en disco.
 - No es anti-adversario: frena el acceso casual, no a un atacante con el equipo.
-- Rotación: si alguien sale del equipo, se regenera el keyfile y se re-cifra
-  (`init-vault.ps1` con la USB nueva).
+- Al salir alguien: revocar (re-cifrar sin su llave) y rotar los secretos que
+  pudo haber visto.
 
-> Este directorio **no** contiene secretos. El keyfile (USB) y `secrets.age`
-> (PC) están ignorados por Git; jamás deben versionarse.
+> Este directorio **no** contiene secretos. `identity.age` (USB),
+> `recipients.txt` y `secrets.age` (PC) están ignorados por Git; jamás
+> versionar.
