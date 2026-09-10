@@ -9,10 +9,24 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-. (Join-Path $PSScriptRoot 'vault-common.ps1')
+# Dentro del .exe (ps2exe) $PSScriptRoot puede venir vacio: resolvemos la
+# carpeta del script/exe con fallbacks antes de cargar vault-common.ps1.
+function Get-ThisDir {
+    $d = $PSScriptRoot
+    if (-not $d -and $PSCommandPath) { $d = Split-Path -Parent $PSCommandPath }
+    if (-not $d) { $d = (Get-Location).Path }
+    if (-not (Test-Path -LiteralPath (Join-Path $d 'vault-common.ps1'))) {
+        foreach ($c in @((Get-Location).Path, (Join-Path (Get-Location).Path 'scripts\vault'))) {
+            if (Test-Path -LiteralPath (Join-Path $c 'vault-common.ps1')) { $d = $c; break }
+        }
+    }
+    return $d
+}
+$BaseDir = Get-ThisDir
+. (Join-Path $BaseDir 'vault-common.ps1')
 
 $Config = Get-VaultConfig
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$RepoRoot = Split-Path -Parent (Split-Path -Parent $BaseDir)
 $stateDir = Get-VaultStateDir -Config $Config
 if (-not (Test-Path -LiteralPath $stateDir)) { New-Item -ItemType Directory -Path $stateDir -Force | Out-Null }
 $backendOut = Join-Path $stateDir 'backend.out.log'
