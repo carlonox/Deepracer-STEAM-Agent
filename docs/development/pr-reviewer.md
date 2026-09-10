@@ -84,6 +84,24 @@ que este PC, todo con software libre:
 - Si el diff toca movimiento/secretos/gobernanza y el revisor no lo marca,
   igual aplica la regla — el humano manda.
 
+## Stack de modelos (2026-09-10, verificado por benchmark)
+
+Benchmark offline: 5 casos históricos (gamepad NO-BUG, proxy BUG, throttle BUG,
+xr-alpha BUG, secret-env NO-BUG) × 13 modelos `:free`.
+
+| Modelo | Score | Nota |
+|---|---|---|
+| `nex-agi/nex-n2.5-pro:free` (primario) | 4/4 | Mejores explicaciones, cita el mapeo STANDARD |
+| `nvidia/nemotron-3-super-120b-a12b:free` | 4/5 | Veredicto-primero, solo falla xr-alpha (caso debatible) |
+| `cohere/north-mini-code:free` | 3/4 | Rápido (2-5s), falla throttle |
+| `openrouter/free` | red final | No-determinístico: solo como última red |
+
+Descartados: `laguna-s` y `gemma-4` (429 persistente), `inkling-small` (403),
+`nemotron-lightning` (34-53s y entierra el veredicto), `ling-fin`/`nex-mini`
+(rapidísimos pero agotan el cap de tokens en andamiaje sin llegar al veredicto).
+Lección de harness: a los modelos que piensan en voz alta hay que pedirles el
+veredicto en la primera línea y/o subirles el cap, o el review sale vacío.
+
 ## Futuro (swarm en Oracle)
 
 Cuando exista la VM Always Free: daemon revisor persistente (patrones
