@@ -19,6 +19,9 @@ ai_timeout = 90
 # tras timeout; con 4 modelos eso multiplica los minutos. Al fallar, que pase
 # directo al fallback.
 retry_same_model_on_timeout = false
+# Razonamiento un nivel abajo del default (medium -> low): nex-pro gastaba
+# ~5.6k tokens de thinking y el run llegaba a ~7 min (tope del job: 8).
+reasoning_effort = "low"
 
 [pr_reviewer]
 # Reglas DEL ROBOT que el revisor genérico no conoce. Todo lo demás

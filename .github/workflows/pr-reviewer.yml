@@ -77,6 +77,8 @@ jobs:
           config.ai_timeout: "90"
           # Sin esto un timeout reintenta el mismo modelo y multiplica el cuelgue.
           config.retry_same_model_on_timeout: "false"
+          # Thinking un nivel abajo (medium -> low) para no acercarse al tope de 8 min.
+          config.reasoning_effort: "low"
           github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "false"
