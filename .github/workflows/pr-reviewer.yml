@@ -47,10 +47,9 @@ jobs:
           OPENROUTER.KEY: "${{ secrets.OPENROUTER_API_KEY }}"
           # Bootstrap: .pr_agent.toml solo se lee desde main (tras el merge).
           # Estas env cubren la primera revisión; el toml manda después.
-          # Auto-router gratis: OpenRouter elige entre los :free vigentes.
-          # Evita la ruleta de IDs retirados (gemini-2.0-flash, inkling solo-agentic).
-          config.model: "openrouter/free"
-          config.fallback_models: '["openrouter/qwen/qwen3-next-80b-a3b-instruct:free"]'
+          # Stack pinnado por benchmark offline (2026-09-10). Espejo del toml.
+          config.model: "nex-agi/nex-n2.5-pro:free"
+          config.fallback_models: '["nvidia/nemotron-3-super-120b-a12b:free", "cohere/north-mini-code:free", "openrouter/free"]'
           config.response_language: "es"
           pr_reviewer.extra_instructions: |
             Prioriza SIEMPRE estas reglas del repo Deepracer-STEAM-Agent:
@@ -60,6 +59,8 @@ jobs:
             4. Conventional Commits 1.0.0 en titulos (type(scope): imperativo, 72 chars max).
             5. Docs e indices van en la misma unidad de cambio.
             6. Responde en espanol, conciso, con archivo:linea.
+            7. En XR inmersiva los gatillos son buttons[0]/[1] (inputSource.gamepad); el mapeo STANDARD 6=LT/7=RT solo vale FUERA de XR (navigator.getGamepads).
+            8. Veredicto primero con archivo:linea y cita del diff; nada de alertas genericas sin evidencia en el cambio.
           # Sin esto PR-Agent rechaza IDs que no trae en su tabla MAX_TOKENS.
           config.custom_model_max_tokens: "200000"
           github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
