@@ -68,9 +68,17 @@ function Start-VaultBackend {
     return $p.Id
 }
 function Stop-VaultBackend { & (Join-Path $PSScriptRoot 'lock-vault.ps1') }
-function Start-Hermes { & docker compose -f (Join-Path $RepoRoot 'docker-compose.yml') --project-directory $RepoRoot up -d 2>&1 | Out-File -LiteralPath $hermesLog -Append }
-function Stop-Hermes { & docker compose -f (Join-Path $RepoRoot 'docker-compose.yml') --project-directory $RepoRoot stop 2>&1 | Out-File -LiteralPath $hermesLog -Append }
-function Test-Listen([int]$Port) { [bool](Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object LocalPort -eq $Port | Select-Object -First 1) }
+function Start-Hermes { Start-Process -FilePath 'docker' -ArgumentList @('compose','-f',(Join-Path $RepoRoot 'docker-compose.yml'),'--project-directory',$RepoRoot,'up','-d') -NoNewWindow | Out-Null }
+function Stop-Hermes { Start-Process -FilePath 'docker' -ArgumentList @('compose','-f',(Join-Path $RepoRoot 'docker-compose.yml'),'--project-directory',$RepoRoot,'stop') -NoNewWindow | Out-Null }
+function Test-Listen([int]$Port) {
+    # TcpClient es ~instantaneo; Get-NetTCPConnection tarda y congelaba la UI.
+    $c = New-Object System.Net.Sockets.TcpClient
+    try {
+        $iar = $c.BeginConnect('127.0.0.1', $Port, $null, $null)
+        if ($iar.AsyncWaitHandle.WaitOne(120)) { $c.EndConnect($iar); return $true }
+        return $false
+    } catch { return $false } finally { $c.Close() }
+}
 function Get-BackendPid {
     $f = Join-Path $stateDir 'vault.pid'
     if (Test-Path -LiteralPath $f) { return [int]((Get-Content -LiteralPath $f -Raw).Trim()) }
@@ -189,12 +197,16 @@ function Set-Led($led, $label, [string]$name, [bool]$ok, [string]$extra = '') {
     if ($ok) { $led.BackColor = $okColor; $label.Text = "$name ok $extra"; $label.ForeColor = $okColor }
     else { $led.BackColor = $badColor; $label.Text = "$name - $extra"; $label.ForeColor = $gray }
 }
+$script:LastLogText = ''
 function Show-Logs {
     switch ($script:LogSource) {
-        'Backend' { $txtLog.Text = (Get-Tail $backendOut) + "`r`n--- stderr ---`r`n" + (Get-Tail $backendErr 100) }
-        'Hermes'  { $txtLog.Text = Get-Tail $hermesLog }
-        default   { $txtLog.Text = ($script:GuiLog -join "`r`n") }
+        'Backend' { $text = (Get-Tail $backendOut) + "`r`n--- stderr ---`r`n" + (Get-Tail $backendErr 100) }
+        'Hermes'  { $text = (& docker compose -f (Join-Path $RepoRoot 'docker-compose.yml') --project-directory $RepoRoot logs --tail 200 2>&1 | Out-String) }
+        default   { $text = ($script:GuiLog -join "`r`n") }
     }
+    if ($text -eq $script:LastLogText) { return }
+    $script:LastLogText = $text
+    $txtLog.Text = $text
     $txtLog.SelectionStart = $txtLog.Text.Length; $txtLog.ScrollToCaret()
 }
 function Sync-GuiLog { if ($script:LogSource -eq 'GUI') { Show-Logs } }
@@ -238,9 +250,13 @@ $cmbLog.Add_SelectedIndexChanged({ $script:LogSource = [string]$cmbLog.SelectedI
 
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 2500
+$script:Tick = 0
+$script:UsbOk = $false
 $timer.Add_Tick({
-    $usb = [bool](Get-UsbVolume -VolumeSerial $Config.UsbVolumeSerial)
-    Set-Led $ledUsb $lblUsb 'USB' $usb $(if ($usb) { '' } else { 'no detectada' })
+    $script:Tick++
+    # La query CIM de la USB es lo mas caro: cada ~10s alcanza.
+    if (($script:Tick % 4) -eq 1) { $script:UsbOk = [bool](Get-UsbVolume -VolumeSerial $Config.UsbVolumeSerial) }
+    Set-Led $ledUsb $lblUsb 'USB' $script:UsbOk $(if ($script:UsbOk) { '' } else { 'no detectada' })
     Set-Led $ledVault $lblVault 'Vault' ($null -ne $script:SecretMap) $(if ($script:SecretMap) { "($($script:SecretMap.Keys.Count))" } else { 'bloqueado' })
 
     $bp = Get-BackendPid; $alive = Test-ProcessAlive $bp; $listen = Test-Listen 5002
@@ -255,7 +271,9 @@ $timer.Add_Tick({
     $hermes = Test-Listen 9999
     Set-Led $ledHermes $lblHermes 'Hermes' $hermes $(if ($hermes) { ':9999' } else { 'apagado' })
 
-    if ($script:LogSource -ne 'GUI') { Show-Logs } elseif ($script:GuiLog.Count -gt 0) { Show-Logs }
+    # La fuente Hermes llama a docker (lento): refrescala cada ~20s, no en cada tick.
+    if ($script:LogSource -eq 'Hermes') { if (($script:Tick % 8) -eq 0) { Show-Logs } }
+    else { Show-Logs }
 })
 $timer.Start()
 
