@@ -10,6 +10,14 @@ hermes/.env.*
 hermes/auth.json
 hermes/auth.lock
 
+# === VAULT LOCAL (Opcion B: USB keyfile + PIN) ===
+secrets.age
+*.age
+keyfile.bin
+*.keyfile
+secrets.local.env
+**/DeepRacerVault/
+
 # === DOCKER COMPOSE (tiene API keys) ===
 docker-compose.yml
 # === KILO CODE ===
