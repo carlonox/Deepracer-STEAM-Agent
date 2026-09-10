@@ -384,3 +384,39 @@ Leer con: `docs/operations/sesion-2026-09-08.md` (bitácora física),
 4. RAG deps + Ollama (Fase 4); Hermes upgrade + backup (Fase 1.5, Docker).
 5. Colaboradores en GitHub (fin del bypass); rotar la clave pegada en chat.
 6. Vault/bridge BT (Fase 1 de bt-teleop) si se adopta teleop.
+
+---
+
+## 🧩 Sesión 2026-09-10: VR/AR, revisor propio, vault de secretos y Hermes
+
+Leer con: `docs/operations/sesion-2026-09-10.md` (bitácora completa),
+`scripts/vault/README.md` (vault), `docs/plans/plan-seguridad-secretos.md`.
+
+### Estado git al cierre
+- `main` incluye **#18**, **#24** y **#26**.
+- Abiertos: **#23** (`docs/vr-lan-proxy-plan-fix`) y **#25** (`feat/vault-usb`),
+  ambos actualizados con `main`.
+
+### Qué quedó hecho
+- **VR/AR (PR #18)**: triggers WebXR reales, freno, stop imparable + dead-man,
+  render XR (cámara+HUD) y modo AR; HTTPS+proxy opt-in para Quest.
+- **Revisor propio**: timeout del job/IA (#24) y `reasoning_effort: low` (#26).
+- **Vault local (PR #25)**: identidad `age` por persona (USB+PIN), vault
+  multi-destinatario, llave de recuperación (BWS/2FA), GUI WinForms + `.exe`
+  (no versionado), `age` 1.3.1. Validado end-to-end.
+- **Hermes**: `.env` sin secretos (los tiene el vault); secretos inyectados por
+  `${VAR}` en el compose; auth de dashboard movida a `config.yaml`
+  (`password_hash`); SOUL curado montado read-only desde `soul/soul.md`.
+
+### Números/entorno
+- Hermes **v0.18.0 (2026.7.1)**, upstream `009b42d0`,
+  imagen `nousresearch/hermes-agent@sha256:1fac25f7…`.
+- `docker stats` del contenedor: ~0.9% CPU / 466 MiB (no es cuello de botella).
+
+### Pendiente priorizado próxima sesión
+1. Mergear #23 y luego #25.
+2. Probar VR triggers en el casco + trim en pista (LiPo llena).
+3. Recrear Hermes desde consola desbloqueada para activar el mount del SOUL.
+4. Rotar credenciales del robot (con robot encendido + autorización).
+5. Colaboradores en GitHub; revisar secretos en `hermes/config.yaml`/`auth.json`.
+6. RAG deps + Ollama (Fase 4); backup/upgrade de Hermes (Fase 1.5).
