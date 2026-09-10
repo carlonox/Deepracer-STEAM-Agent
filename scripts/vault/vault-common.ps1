@@ -6,7 +6,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 function Get-VaultConfig {
-    Import-PowerShellDataFile -LiteralPath (Join-Path $PSScriptRoot 'vault.config.psd1')
+    # $PSScriptRoot/$PSCommandPath pueden venir vacios bajo .exe (ps2exe).
+    $dir = $PSScriptRoot
+    if (-not $dir -and $PSCommandPath) { $dir = Split-Path -Parent $PSCommandPath }
+    if (-not $dir) { $dir = (Get-Location).Path }
+    Import-PowerShellDataFile -LiteralPath (Join-Path $dir 'vault.config.psd1')
 }
 
 function Get-AgeDir {
