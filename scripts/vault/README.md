@@ -63,6 +63,34 @@ Remove-Item secrets.local.env                        # borra el plano
 Re-cifrar requiere **tu** USB + PIN (usa tu identidad para abrir y volver a
 cerrar para el nuevo conjunto de llaves).
 
+## Recuperación (si olvidas el PIN)
+
+Con `age` y sin servidor, olvidar el PIN deja tu identidad ilegible: **el 2FA
+por sí solo no recupera**. La salida es una **llave de recuperación** guardada
+aparte, que sí puede descifrar el vault.
+
+1. Una vez (con el vault funcionando):
+   ```powershell
+   .\scripts\vault\new-recovery.ps1 -Label recovery
+   ```
+   Imprime una clave `AGE-SECRET-KEY-1...`. **Guárdala en BWS (con 2FA)**; no se
+   vuelve a mostrar. Su pública queda en `recipients.txt`.
+
+2. Si olvidas tu PIN:
+   ```powershell
+   # a) crea una identidad nueva con PIN nuevo (nueva USB o la misma)
+   .\scripts\vault\new-identity.ps1 -Label <nombre>
+   # b) recupera el vault con la clave de BWS (login BWS + TOTP)
+   .\scripts\vault\recover-vault.ps1     # pega AGE-SECRET-KEY-1...
+   # c) ahora tu identidad nueva ya abre el vault
+   .\scripts\vault\unlock-vault.ps1
+   ```
+   Esto es "cambiar contraseña con verificación 2FA": el 2FA abre BWS, BWS da
+   la llave de recuperación, y con ella se re-cifra para tu llave nueva.
+
+> La llave de recuperación es tan poderosa como cualquier USB: no la guardes en
+> el mismo PC que el vault. En BWS, protégé la cuenta con TOTP y rol mínimo.
+
 ## Archivos
 
 | Archivo | Rol |
@@ -70,6 +98,8 @@ cerrar para el nuevo conjunto de llaves).
 | `vault-common.ps1` | Helpers (USB por serial, identidades, proteger/descifrar). Sin secretos. |
 | `vault.config.psd1` | Serial de la USB, rutas, nombres. Sin secretos. |
 | `new-identity.ps1` | Crea tu identidad (USB+PIN) y te registra como destinatario. |
+| `new-recovery.ps1` | Crea la llave de recuperación; guardarla en BWS con 2FA. |
+| `recover-vault.ps1` | Re-cifra el vault usando la llave de recuperación. |
 | `init-vault.ps1` | Cifra un `.env` local a todos los destinatarios. |
 | `unlock-vault.ps1` | Descifra con tu USB+PIN; opcional `-StartBackend`. |
 | `add-recipient.ps1` | Agrega/remueve destinatarios y re-cifra. |
