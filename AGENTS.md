@@ -39,8 +39,11 @@ Estas reglas aplican a todo el repositorio.
   `grep -r` recursivo en árboles grandes (se cuelga y bloquea el turno).
 - Un resultado **vacío no es concluyente** en árboles de datos (logs, backups,
   rutas ignoradas): reintentar con `-uu`/`-uuu` antes de reportar "no existe".
-- Gotchas: `rg` no sigue symlinks sin `-L`; saltea en silencio archivos con
-  bytes NUL (`-a` los fuerza); respeta `.gitignore` global.
+- Gotchas: `rg` no sigue symlinks sin `-L`; trata como binarios los archivos
+  con bytes NUL y puede omitir sus coincidencias en búsquedas recursivas;
+  al buscar un archivo directamente puede mostrar un aviso (`-a`/`--text`
+  los busca como texto y puede imprimir datos de control); respeta
+  `.gitignore` global.
 
 ## Seguridad del robot
 
