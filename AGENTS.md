@@ -33,6 +33,15 @@ Estas reglas aplican a todo el repositorio.
 - Una ruta antigua solo puede quedar en documentación histórica si está
   etiquetada como antigua.
 
+## Herramientas de shell — búsquedas (ripgrep primero)
+
+- Buscar en archivos: `rg` (ripgrep) o la tool `search_files` — **nunca**
+  `grep -r` recursivo en árboles grandes (se cuelga y bloquea el turno).
+- Un resultado **vacío no es concluyente** en árboles de datos (logs, backups,
+  rutas ignoradas): reintentar con `-uu`/`-uuu` antes de reportar "no existe".
+- Gotchas: `rg` no sigue symlinks sin `-L`; saltea en silencio archivos con
+  bytes NUL (`-a` los fuerza); respeta `.gitignore` global.
+
 ## Seguridad del robot
 
 - No ejecutes `start-deepracer.ps1`, `/api/start`, `/api/manual_drive`, scripts
