@@ -22,6 +22,10 @@ Antes de reorganizar rutas, lee el plan completo. Los movimientos se ejecutan
 por componentes y con validaciones intermedias; iniciar el software no debe
 usarse como prueba automática porque algunos flujos pueden activar el vehículo.
 
+## Arquitectura
+
+![Arquitectura del proyecto](docs/architecture/architecture_diagram.png)
+
 ## Requisitos
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
