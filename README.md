@@ -24,7 +24,7 @@ usarse como prueba automática porque algunos flujos pueden activar el vehículo
 
 ## Arquitectura
 
-![Arquitectura del proyecto](architecture_diagram.png)
+![Arquitectura del proyecto](docs/architecture/architecture_diagram.png)
 
 ## Requisitos
 
