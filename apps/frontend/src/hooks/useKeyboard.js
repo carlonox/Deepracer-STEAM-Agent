@@ -43,7 +43,6 @@ export default function useKeyboard(enabled, maxSpeed) {
         throttle = 0;
       }
     }
-    console.log(`⌨️ Calculated command from keys [${[...keys].join(', ')}]: Angle=${angle}° Throttle=${throttle}%`);
     return { angle, throttle };
   };
 
@@ -59,7 +58,6 @@ export default function useKeyboard(enabled, maxSpeed) {
       setPressedKeys(new Set(activeKeys));
 
       const { angle, throttle } = calculateCommand(activeKeys);
-      console.log(`⌨️ KeyDown: ${e.key} | Keys: [${[...activeKeys].join(', ')}] | Angle=${angle}° Throttle=${throttle}%`);
       if (angle !== 0 || throttle !== 0) {
         await sendManualCommand(angle, throttle, maxSpeed);
       }
@@ -68,7 +66,6 @@ export default function useKeyboard(enabled, maxSpeed) {
     const handleKeyUp = async (e) => {
       activeKeys.delete(e.key);
       setPressedKeys(new Set(activeKeys));
-      console.log(`⌨️ KeyUp: ${e.key} | Keys: [${[...activeKeys].join(', ')}]`);
 
       if (activeKeys.size > 0) {
         const { angle, throttle } = calculateCommand(activeKeys);
@@ -77,9 +74,8 @@ export default function useKeyboard(enabled, maxSpeed) {
         await sendManualCommand(0, 0, maxSpeed);
       }
     };
-
     const handleBlur = async () => {
-      console.log('⌨️ Window blur - clearing keys');
+    const handleBlur = async () => {
       activeKeys.clear();
       setPressedKeys(new Set());
       await sendManualCommand(0, 0, maxSpeed);
@@ -87,7 +83,6 @@ export default function useKeyboard(enabled, maxSpeed) {
 
     const handleVisibilityChange = async () => {
       if (document.hidden) {
-        console.log('⌨️ Document hidden - clearing keys');
         activeKeys.clear();
         setPressedKeys(new Set());
         await sendManualCommand(0, 0, maxSpeed);

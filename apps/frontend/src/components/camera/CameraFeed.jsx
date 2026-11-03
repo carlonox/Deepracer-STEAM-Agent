@@ -30,27 +30,20 @@ export default function CameraFeed() {
   };
 
   return (
-    <div 
-      ref={containerRef} 
-      className={`relative group ${
-        isFullscreen ? 'w-screen h-screen bg-black flex items-center justify-center' : 'flex justify-center'
-      }`}
+    <div
+      ref={containerRef}
+      className={`camera-feed ${isFullscreen ? 'camera-fullscreen' : ''}`}
     >
       <img
         src={cameraUrl}
         alt="DeepRacer Camera Feed"
-        className={isFullscreen 
-          ? 'max-w-full max-h-full object-contain' 
-          : 'rounded-xl shadow-lg max-w-full'
-        }
-        style={isFullscreen ? { width: '100%', height: '100%', objectFit: 'contain' } : {}}
       />
-      <button 
+      <button
+        type="button"
         onClick={toggleFullscreen}
-        className={`absolute top-2 right-2 btn btn-sm btn-circle btn-ghost bg-base-100/70 transition-opacity ${
-          isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-        }`}
+        className="camera-fullscreen-button"
         title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+        aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
       >
         {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
       </button>

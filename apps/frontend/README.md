@@ -19,6 +19,14 @@ táctiles, gamepad y WebXR.
 Vite lee el `.env` de la raíz mediante `envDir`; solo las variables con prefijo
 `VITE_` quedan expuestas al navegador.
 
+## Organización de la interfaz
+
+`src/App.jsx` compone la vista principal; los paneles de cada modo viven en
+`src/components/dashboard/`, y la conducción WebXR/Gamepad API se mantiene en
+`src/hooks/useVRDrive.js`. Los estilos específicos del dashboard están en
+`src/styles/dashboard.css`. Los contratos de la API y los parámetros de
+conducción no cambian.
+
 ## VR en Quest por LAN (HTTPS opcional)
 
 El navegador 2D del Quest **no expone** los Touch fuera de sesión XR y la

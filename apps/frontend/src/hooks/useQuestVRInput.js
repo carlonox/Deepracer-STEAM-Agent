@@ -80,7 +80,6 @@ export default function useQuestVRInput() {
 
   const startSession = useCallback(async (display = "vr") => {
     if (!navigator.xr) {
-      console.error("WebXR not available");
       setXrStatus("sin navigator.xr (¿HTTP?)");
       return false;
     }
@@ -99,13 +98,11 @@ export default function useQuestVRInput() {
       }
 
       if (!sessionType) {
-        console.log('🥽 WebXR: No immersive session type supported');
         setXrStatus("sin sesión inmersiva (vr/ar no soportado)");
         return false;
       }
       const isAR = sessionType === "immersive-ar";
 
-      console.log(`🥽 WebXR: Starting ${sessionType} session...`);
       setXrStatus(`pidiendo ${sessionType}…`);
       const session = await navigator.xr.requestSession(sessionType, {
         optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
@@ -114,10 +111,8 @@ export default function useQuestVRInput() {
       sessionRef.current = session;
       setIsSessionActive(true);
       setXrStatus("sesión ok · montando GL…");
-      console.log("✅ WebXR session started");
 
       session.addEventListener("end", () => {
-        console.log("🥽 WebXR: Session ended");
         sessionRef.current = null;
         setXrStatus("sesión terminada");
         try { glRef.current?.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* noop */ }
