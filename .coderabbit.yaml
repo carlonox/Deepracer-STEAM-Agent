@@ -1,0 +1,7 @@
+# CodeRabbit deshabilitado el 2026-11-05: sus revisiones no aportaban.
+# Para reactivarlo, borrar este archivo o poner auto_review.enabled: true.
+reviews:
+  auto_review:
+    enabled: false
+chat:
+  auto_reply: false
