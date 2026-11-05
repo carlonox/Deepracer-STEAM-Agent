@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { getCameraStreamUrl } from "../config/frontend";
 
 export default function useQuestVRInput() {
   const [isSupported, setIsSupported] = useState(null); // null = checking, true/false = result
@@ -135,11 +136,7 @@ export default function useQuestVRInput() {
 
       // Render mínimo: una sesión inmersiva SIN capa WebGL queda en negro.
       // Dibujamos la cámara del robot + un HUD (modo, gatillos, mando).
-      const useProxy = import.meta.env.VITE_API_PROXY === "1";
-      const awsHost = import.meta.env.VITE_AWS_HOST || "localhost";
-      const camUrl = useProxy
-        ? "/video/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85"
-        : `http://${awsHost}:8080/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85`;
+      const camUrl = getCameraStreamUrl();
       // En AR no se carga la cámara: ves el cuarto directo (cero lag,
       // máxima nitidez) y solo flota el HUD.
       const camImg = new Image();

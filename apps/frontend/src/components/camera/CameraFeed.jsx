@@ -1,17 +1,16 @@
 import { useRef, useState, useEffect } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import { getCameraStreamUrl } from '../../config/frontend';
 
-
-export default function CameraFeed() {
+export default function CameraFeed({ onStatusChange }) {
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const AWS_HOST = import.meta.env.VITE_AWS_HOST || "localhost";
-  // Con VITE_API_PROXY=1 el MJPEG va por mismo origen (/video/...) y vite
-  // lo proxea al robot (evita mixed-content bajo HTTPS).
-  const cameraUrl =
-    import.meta.env.VITE_API_PROXY === "1"
-      ? `/video/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85`
-      : `http://${AWS_HOST}:8080/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85`;
+  const [cameraStatus, setCameraStatus] = useState('connecting');
+  const cameraUrl = getCameraStreamUrl();
+
+  useEffect(() => {
+    onStatusChange?.(cameraStatus);
+  }, [cameraStatus, onStatusChange]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -37,7 +36,14 @@ export default function CameraFeed() {
       <img
         src={cameraUrl}
         alt="DeepRacer Camera Feed"
+        onLoad={() => setCameraStatus('connected')}
+        onError={() => setCameraStatus('error')}
       />
+      {cameraStatus !== 'connected' && (
+        <p className="camera-message" role="status">
+          {cameraStatus === 'error' ? 'No se pudo conectar con la cámara.' : 'Conectando con la cámara…'}
+        </p>
+      )}
       <button
         type="button"
         onClick={toggleFullscreen}

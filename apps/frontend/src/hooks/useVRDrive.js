@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { sendManualCommand } from '../services/vehicleApi';
+import { sendManualCommand } from '../services/api/vehicleApi';
 import useQuestVRInput from './useQuestVRInput';
+import { getDirectionalCommand } from '../shared/utils/vehicleCommands';
 
-export default function useVRDrive({ enabled, controlMode, display, maxSpeed }) {
+export default function useVRDrive({ enabled, controlMode, display, maxSpeed, onError }) {
   const xr = useQuestVRInput();
   const [vrInput, setVrInput] = useState({ steering: 0, throttle: 0 });
   const [padCount, setPadCount] = useState(0);
@@ -27,43 +28,22 @@ export default function useVRDrive({ enabled, controlMode, display, maxSpeed }) 
     lastSendTime.current = now;
 
     const threshold = 12;
-    const isUp = dirY < -threshold;
-    const isDown = dirY > threshold;
-    const isLeft = dirX < -threshold;
-    const isRight = dirX > threshold;
-    let angle = 0;
-    let throttle = 0;
-
-    if (isUp && isRight) {
-      angle = 45;
-      throttle = -100;
-    } else if (isUp && isLeft) {
-      angle = -45;
-      throttle = -100;
-    } else if (isDown && isRight) {
-      angle = 45;
-      throttle = 100;
-    } else if (isDown && isLeft) {
-      angle = -45;
-      throttle = 100;
-    } else if (isUp) {
-      throttle = -100;
-    } else if (isDown) {
-      throttle = 100;
-    } else if (isLeft) {
-      angle = -45;
-    } else if (isRight) {
-      angle = 45;
-    }
+    const { angle, throttle } = getDirectionalCommand({
+      forward: dirY < -threshold,
+      reverse: dirY > threshold,
+      left: dirX < -threshold,
+      right: dirX > threshold,
+    });
 
     if (angle !== 0 || throttle !== 0 || forceStop) {
       try {
         await sendManualCommand(angle, throttle, maxSpeed);
       } catch (error) {
         console.error('Error sending VR command:', error);
+        onError?.(error);
       }
     }
-  }, [maxSpeed]);
+  }, [maxSpeed, onError]);
 
   const sendVRStop = useCallback(() => {
     lastVRSent.current = { active: false };
@@ -75,10 +55,11 @@ export default function useVRDrive({ enabled, controlMode, display, maxSpeed }) 
       setTimeout(() => {
         sendManualCommand(0, 0, maxSpeed).catch((error) => {
           console.error('Error reinforcing VR stop:', error);
+          onError?.(error);
         });
       }, ms)
     );
-  }, [maxSpeed, sendVRCommand]);
+  }, [maxSpeed, onError, sendVRCommand]);
 
   useEffect(() => () => stopTimers.current.forEach(clearTimeout), []);
 

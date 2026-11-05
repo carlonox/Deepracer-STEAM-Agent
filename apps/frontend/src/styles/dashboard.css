@@ -1,4 +1,11 @@
 .app-shell {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --content-width: 1440px;
   --surface: #111821;
   --surface-raised: #151f2b;
   --surface-muted: #0d141c;
@@ -17,11 +24,11 @@
 }
 
 .topbar {
-  height: 76px;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 clamp(20px, 5vw, 72px);
+  padding: 0 18px;
   border-bottom: 1px solid rgba(146, 165, 184, 0.12);
   background: rgba(11, 16, 23, 0.82);
 }
@@ -89,6 +96,11 @@
   letter-spacing: 0.06em;
 }
 
+.system-label,
+.camera-footer > span:last-child {
+  display: none;
+}
+
 .system-label svg {
   color: var(--accent);
 }
@@ -128,11 +140,11 @@
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
-  gap: clamp(24px, 4vw, 52px);
-  width: min(1440px, 100%);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  width: min(var(--content-width), 100%);
   margin: 0 auto;
-  padding: 44px clamp(20px, 5vw, 72px) 56px;
+  padding: 24px 16px 36px;
 }
 
 .camera-column,
@@ -194,11 +206,96 @@
   animation: live-pulse 1.8s ease-in-out infinite;
 }
 
+.camera-offline {
+  color: #fb7185;
+}
+
+.status-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  width: min(var(--content-width), 100%);
+  margin: 0 auto;
+  padding: var(--space-3) 16px 0;
+}
+
+.status-summary > div:first-child {
+  grid-column: 1 / -1;
+}
+
+.status-summary > div {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid rgba(143, 162, 181, 0.13);
+  border-radius: 10px;
+  background: rgba(17, 24, 33, 0.72);
+}
+
+.status-summary dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.status-summary dd {
+  overflow: hidden;
+  margin: var(--space-1) 0 0;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast-message {
+  position: fixed;
+  z-index: 10;
+  top: 88px;
+  right: max(16px, calc((100vw - var(--content-width)) / 2));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(440px, calc(100vw - 32px));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.toast-error {
+  border-color: rgba(251, 113, 133, 0.45);
+}
+
+.toast-message button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  padding: var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.camera-message {
+  position: absolute;
+  inset: auto var(--space-3) var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  background: rgba(5, 8, 12, 0.82);
+  color: #e8edf5;
+  font-size: 12px;
+  text-align: center;
+}
+
 .camera-panel {
   position: relative;
   overflow: hidden;
-  min-height: 300px;
-  aspect-ratio: 16 / 10;
+  min-height: 220px;
+  aspect-ratio: 4 / 3;
   border: 1px solid #2a3745;
   border-radius: 16px;
   background:
@@ -287,7 +384,7 @@
 }
 
 .control-panel {
-  padding: 22px;
+  padding: 19px;
 }
 
 .panel-heading {
@@ -702,7 +799,52 @@
   50% { opacity: 0.45; }
 }
 
-@media (max-width: 900px) {
+@media (min-width: 721px) {
+  .topbar {
+    height: 76px;
+    padding-inline: clamp(20px, 5vw, 72px);
+  }
+
+  .system-label {
+    display: inline-flex;
+  }
+
+  .dashboard-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    gap: clamp(24px, 4vw, 52px);
+    padding: 44px clamp(20px, 5vw, 72px) 56px;
+  }
+
+  .camera-panel {
+    min-height: 300px;
+    aspect-ratio: 16 / 10;
+  }
+
+  .camera-footer > span:last-child {
+    display: inline-flex;
+  }
+
+  .control-panel {
+    padding: 22px;
+  }
+}
+
+@media (min-width: 901px) {
+  .status-summary {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: var(--space-4) clamp(20px, 5vw, 72px) 0;
+  }
+
+  .status-summary > div:first-child {
+    grid-column: auto;
+  }
+
+  .status-summary dd {
+    font-size: 12px;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 900px) {
   .dashboard-layout {
     grid-template-columns: minmax(0, 1fr) 320px;
     gap: 20px;
@@ -711,36 +853,6 @@
 
   .control-panel {
     padding: 17px;
-  }
-}
-
-@media (max-width: 720px) {
-  .topbar {
-    height: 68px;
-    padding-inline: 18px;
-  }
-
-  .system-label {
-    display: none;
-  }
-
-  .dashboard-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
-    padding: 24px 16px 36px;
-  }
-
-  .camera-panel {
-    min-height: 220px;
-    aspect-ratio: 4 / 3;
-  }
-
-  .camera-footer > span:last-child {
-    display: none;
-  }
-
-  .control-panel {
-    padding: 19px;
   }
 }
 

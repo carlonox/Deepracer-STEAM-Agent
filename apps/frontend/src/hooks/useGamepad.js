@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { sendManualCommand } from '../services/vehicleApi';
+import { sendManualCommand } from '../services/api/vehicleApi';
+import { getDirectionalCommand } from '../shared/utils/vehicleCommands';
 
 /**
  * Custom hook for gamepad control
@@ -9,7 +10,7 @@ import { sendManualCommand } from '../services/vehicleApi';
  * @param {function} onSpeedChange - Callback to change speed (optional)
  * @returns {object} Gamepad state and controls
  */
-export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange) {
+export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange, onError) {
   const [isConnected, setIsConnected] = useState(false);
   const gamepadIndexRef = useRef(null);
   const animationIdRef = useRef(null);
@@ -22,7 +23,7 @@ export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange) {
 
   useEffect(() => {
     const stopVehicle = async () => {
-      await sendManualCommand(0, 0, maxSpeed);
+      await sendManualCommand(0, 0, maxSpeed).catch((error) => onError?.(error));
     };
     if (!enabled) return;
 
@@ -66,29 +67,13 @@ export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange) {
         const dpadRight = gp.buttons[15]?.pressed || false;
 
         if (dpadUp || dpadDown || dpadLeft || dpadRight) {
-          if (dpadUp && dpadRight) {
-            angle = 45;
-            throttle = -100;
-          } else if (dpadUp && dpadLeft) {
-            angle = -45;
-            throttle = -100;
-          } else if (dpadDown && dpadRight) {
-            angle = 45;
-            throttle = 100;
-          } else if (dpadDown && dpadLeft) {
-            angle = -45;
-            throttle = 100;
-          } else if (dpadUp) {
-            throttle = -100;
-          } else if (dpadDown) {
-            throttle = 100;
-          } else if (dpadLeft) {
-            angle = -45;
-            throttle = -100;
-          } else if (dpadRight) {
-            angle = 45;
-            throttle = -100;
-          }
+          ({ angle, throttle } = getDirectionalCommand({
+            forward: dpadUp,
+            reverse: dpadDown,
+            left: dpadLeft,
+            right: dpadRight,
+            steeringThrottle: -100,
+          }));
         } else if (mode === 'joystick') {
           // Joystick mode
           const axisX = gp.axes[0];
@@ -146,7 +131,10 @@ export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange) {
             (lastCommandRef.current.angle !== 0 || lastCommandRef.current.throttle !== 0))
         ) {
           lastCommandRef.current = { angle, throttle };
-          sendManualCommand(angle, throttle, maxSpeed);
+          sendManualCommand(angle, throttle, maxSpeed).catch((error) => {
+            console.error('Error sending gamepad command:', error);
+            onError?.(error);
+          });
         }
 
         animationIdRef.current = requestAnimationFrame(update);
@@ -175,11 +163,8 @@ export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange) {
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
       }
-      if (gamepadIndexRef.current !== null) {
-        stopVehicle();
-      }
     };
-  }, [enabled, mode, maxSpeed]);
+  }, [enabled, mode, maxSpeed, onSpeedChange, onError]);
 
   return { isConnected };
 }

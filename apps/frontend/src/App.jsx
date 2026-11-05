@@ -1,25 +1,34 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Camera, Radio } from 'lucide-react';
 import CameraFeed from './components/camera/CameraFeed';
 import ControlPanel from './components/dashboard/ControlPanel';
 import DashboardHeader from './components/dashboard/DashboardHeader';
+import useVehicleControl from './features/vehicle/useVehicleControl';
 import useGamepad from './hooks/useGamepad';
 import useKeyboard from './hooks/useKeyboard';
-import useVehicleControl from './hooks/useVehicleControl';
 import useVRDrive from './hooks/useVRDrive';
-import { activateManualMode } from './services/vehicleApi';
+import useGamepadPresence from './shared/hooks/useGamepadPresence';
+import useToast from './shared/hooks/useToast';
+import ToastRegion from './shared/components/ToastRegion';
+import VehicleStatus from './shared/components/VehicleStatus';
 import './styles/dashboard.css';
 
 function App() {
-  const { loading, status, manualMode, setManualMode, startAuto, stop, activateManual } = useVehicleControl();
+  const { toast, notify, dismiss } = useToast();
+  const { loading, status, manualMode, vrMode, startAuto, stop, activateManual, activateVR: activateVRMode } = useVehicleControl(notify);
   const [maxSpeed, setMaxSpeed] = useState(0.5);
   const [gamepadMode, setGamepadMode] = useState('joystick');
-  const [vrMode, setVrMode] = useState(false);
   const [vrControlMode, setVrControlMode] = useState('triggers');
   const [vrDisplay, setVrDisplay] = useState('vr');
+  const [cameraStatus, setCameraStatus] = useState('connecting');
 
-  const { isConnected: gamepadConnected } = useGamepad(manualMode, gamepadMode, maxSpeed, setMaxSpeed);
-  const { pressedKeys } = useKeyboard(true, maxSpeed);
+  const gamepadConnected = useGamepadPresence();
+  const reportControlError = useCallback(
+    (error) => notify(`Error de control: ${error.message}`),
+    [notify],
+  );
+  useGamepad(manualMode, gamepadMode, maxSpeed, setMaxSpeed, reportControlError);
+  const { pressedKeys } = useKeyboard(true, maxSpeed, reportControlError);
   const {
     leftController,
     rightController,
@@ -31,37 +40,34 @@ function App() {
     padCount,
     startSession: startXRSession,
     endSession: endXRSession,
-  } = useVRDrive({ enabled: vrMode, controlMode: vrControlMode, display: vrDisplay, maxSpeed });
+  } = useVRDrive({
+    enabled: vrMode,
+    controlMode: vrControlMode,
+    display: vrDisplay,
+    maxSpeed,
+    onError: reportControlError,
+  });
 
   const activateVR = async () => {
-    setManualMode(false);
-    setVrMode(true);
-
-    try {
-      await activateManualMode();
-    } catch (error) {
-      console.error('Error initializing VR mode:', error);
-    }
-
-    try {
-      await startXRSession(vrDisplay);
-    } catch (error) {
-      console.error('Error starting XR session:', error);
+    if (!(await activateVRMode())) return;
+    const started = await startXRSession(vrDisplay);
+    if (!started) {
+      notify('No se pudo iniciar WebXR. El control VR seguirá disponible mediante Gamepad API.', 'info');
     }
   };
 
   const handleActivateManual = async () => {
-    setVrMode(false);
+    if (vrMode) await endXRSession().catch(reportControlError);
     await activateManual();
   };
 
+  const handleStartAuto = async () => {
+    if (vrMode) await endXRSession().catch(reportControlError);
+    await startAuto();
+  };
+
   const handleStop = async () => {
-    setVrMode(false);
-    try {
-      await endXRSession();
-    } catch (error) {
-      console.error('Error ending XR session:', error);
-    }
+    await endXRSession().catch(reportControlError);
     await stop();
   };
 
@@ -72,6 +78,14 @@ function App() {
   return (
     <div className="app-shell" data-theme="dark">
       <DashboardHeader status={status} />
+      <VehicleStatus
+        status={status}
+        maxSpeed={maxSpeed}
+        gamepadConnected={gamepadConnected}
+        xrSupported={isSupported}
+        cameraStatus={cameraStatus}
+      />
+      <ToastRegion toast={toast} onDismiss={dismiss} />
 
       <main className="dashboard-layout">
         <section className="camera-column" aria-labelledby="camera-title">
@@ -81,11 +95,13 @@ function App() {
               <p className="eyebrow">VISIÓN EN DIRECTO</p>
               <h2 id="camera-title">Cámara del vehículo</h2>
             </div>
-            <span className="live-indicator"><span /> EN VIVO</span>
+            <span className={`live-indicator ${cameraStatus === 'error' ? 'camera-offline' : ''}`}>
+              <span /> {cameraStatus === 'connected' ? 'EN VIVO' : cameraStatus === 'error' ? 'SIN SEÑAL' : 'CONECTANDO'}
+            </span>
           </div>
 
           <div className="camera-panel">
-            <CameraFeed />
+            <CameraFeed onStatusChange={setCameraStatus} />
           </div>
 
           <div className="camera-footer">
@@ -97,9 +113,10 @@ function App() {
         <aside className="control-column" aria-label="Controles del vehículo">
           <ControlPanel
             loading={loading}
+            status={status}
             manualMode={manualMode}
             vrMode={vrMode}
-            onStartAuto={startAuto}
+            onStartAuto={handleStartAuto}
             onStop={handleStop}
             onActivateManual={handleActivateManual}
             onActivateVR={activateVR}

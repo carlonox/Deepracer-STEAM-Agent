@@ -4,6 +4,7 @@ import VRControls from './VRControls';
 
 export default function ControlPanel({
   loading,
+  status,
   manualMode,
   vrMode,
   onStartAuto,
@@ -31,6 +32,8 @@ export default function ControlPanel({
   xrStatus,
   padCount,
 }) {
+  const isAutoMode = status === 'Automático activo';
+
   return (
     <section className="panel control-panel">
       <div className="panel-heading">
@@ -104,8 +107,12 @@ export default function ControlPanel({
         <div className="idle-message">
           <span className="idle-indicator" />
           <div>
-            <strong>Vehículo en espera</strong>
-            <p>Selecciona un modo para comenzar el control.</p>
+            <strong>{isAutoMode ? 'Modo automático activo' : 'Vehículo detenido'}</strong>
+            <p>
+              {isAutoMode
+                ? 'El control manual y VR están inactivos.'
+                : 'Selecciona un modo para comenzar el control.'}
+            </p>
           </div>
         </div>
       )}

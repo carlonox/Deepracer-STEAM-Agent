@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { sendManualCommand } from '../services/vehicleApi';
+import { sendManualCommand } from '../services/api/vehicleApi';
+import { getKeyboardCommand } from '../shared/utils/vehicleCommands';
 
 /**
  * Custom hook for keyboard control
@@ -7,44 +8,9 @@ import { sendManualCommand } from '../services/vehicleApi';
  * @param {number} maxSpeed - Maximum speed value
  * @returns {object} Keyboard state
  */
-export default function useKeyboard(enabled, maxSpeed) {
+export default function useKeyboard(enabled, maxSpeed, onError) {
   const [pressedKeys, setPressedKeys] = useState(new Set());
   const activeKeysRef = useRef(new Set());
-
-  const calculateCommand = (keys) => {
-    let angle = 0;
-    let throttle = 0;
-
-    const isUp = keys.has('ArrowUp') || keys.has('w') || keys.has('W');
-    const isDown = keys.has('ArrowDown') || keys.has('s') || keys.has('S');
-    const isLeft = keys.has('ArrowLeft') || keys.has('a') || keys.has('A');
-    const isRight = keys.has('ArrowRight') || keys.has('d') || keys.has('D');
-
-    if (isUp && isRight) {
-      angle = 45;
-      throttle = -100;
-    } else if (isUp && isLeft) {
-      angle = -45;
-      throttle = -100;
-    } else if (isDown && isRight) {
-      angle = 45;
-      throttle = 100;
-    } else if (isDown && isLeft) {
-      angle = -45;
-      throttle = 100;
-    } else {
-      if (isUp) throttle = -100;
-      else if (isDown) throttle = 100;
-      else if (isLeft) {
-        angle = -45;
-        throttle = 0;
-      } else if (isRight) {
-        angle = 45;
-        throttle = 0;
-      }
-    }
-    return { angle, throttle };
-  };
 
   useEffect(() => {
     if (!enabled) return;
@@ -57,9 +23,9 @@ export default function useKeyboard(enabled, maxSpeed) {
       activeKeys.add(e.key);
       setPressedKeys(new Set(activeKeys));
 
-      const { angle, throttle } = calculateCommand(activeKeys);
+      const { angle, throttle } = getKeyboardCommand(activeKeys);
       if (angle !== 0 || throttle !== 0) {
-        await sendManualCommand(angle, throttle, maxSpeed);
+        sendManualCommand(angle, throttle, maxSpeed).catch((error) => onError?.(error));
       }
     };
 
@@ -68,24 +34,23 @@ export default function useKeyboard(enabled, maxSpeed) {
       setPressedKeys(new Set(activeKeys));
 
       if (activeKeys.size > 0) {
-        const { angle, throttle } = calculateCommand(activeKeys);
-        await sendManualCommand(angle, throttle, maxSpeed);
+        const { angle, throttle } = getKeyboardCommand(activeKeys);
+        sendManualCommand(angle, throttle, maxSpeed).catch((error) => onError?.(error));
       } else {
-        await sendManualCommand(0, 0, maxSpeed);
+        sendManualCommand(0, 0, maxSpeed).catch((error) => onError?.(error));
       }
     };
     const handleBlur = async () => {
-    const handleBlur = async () => {
       activeKeys.clear();
       setPressedKeys(new Set());
-      await sendManualCommand(0, 0, maxSpeed);
+      sendManualCommand(0, 0, maxSpeed).catch((error) => onError?.(error));
     };
 
     const handleVisibilityChange = async () => {
       if (document.hidden) {
         activeKeys.clear();
         setPressedKeys(new Set());
-        await sendManualCommand(0, 0, maxSpeed);
+        sendManualCommand(0, 0, maxSpeed).catch((error) => onError?.(error));
       }
     };
 
@@ -100,9 +65,9 @@ export default function useKeyboard(enabled, maxSpeed) {
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       activeKeys.clear();
-      sendManualCommand(0, 0, maxSpeed);
+      sendManualCommand(0, 0, maxSpeed).catch((error) => onError?.(error));
     };
-  }, [enabled, maxSpeed]);
+  }, [enabled, maxSpeed, onError]);
 
   return { pressedKeys };
 }

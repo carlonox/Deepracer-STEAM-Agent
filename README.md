@@ -70,6 +70,8 @@ usarse como prueba automática porque algunos flujos pueden activar el vehículo
 
 1. Copia `.env.example` como `.env` y llena tus datos (incluye la calibración
    del vehículo: `THROTTLE_DEAD_ZONE` y `STRAIGHT_ANGLE_OFFSET`)
+   Las variables opcionales del frontend y sus valores por defecto están
+   documentados en [apps/frontend/README.md](apps/frontend/README.md).
 2. El DeepRacer necesita Tailscale conectado a la misma cuenta
 3. La IP de Tailscale del DeepRacer nunca cambia (la IP LAN sí cambia por DHCP)
 4. Calibración: el backend aplica la zona muerta del throttle automáticamente;

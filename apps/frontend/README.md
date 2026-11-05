@@ -21,11 +21,30 @@ Vite lee el `.env` de la raíz mediante `envDir`; solo las variables con prefijo
 
 ## Organización de la interfaz
 
-`src/App.jsx` compone la vista principal; los paneles de cada modo viven en
-`src/components/dashboard/`, y la conducción WebXR/Gamepad API se mantiene en
-`src/hooks/useVRDrive.js`. Los estilos específicos del dashboard están en
-`src/styles/dashboard.css`. Los contratos de la API y los parámetros de
-conducción no cambian.
+`src/App.jsx` compone la vista; `src/features/vehicle/` mantiene el estado del
+modo y `src/services/api/vehicleApi.js` centraliza las llamadas al backend.
+Los controles reutilizan `src/shared/utils/vehicleCommands.js`; los mensajes y
+el estado general viven en `src/shared/`. Cámara y WebXR conservan sus
+componentes/hooks actuales. Los contratos de la API no cambian.
+
+Para un recorrido técnico de arranque, estructura, estados, controles, API,
+VR, cámara, responsividad y validaciones, consulta la
+[guía del frontend](FRONTEND_GUIDE.md).
+
+## Variables de entorno del frontend
+
+Las variables se leen del `.env` de la raíz; todas son opcionales:
+
+| Variable | Obligatoria | Valor por defecto | Uso |
+|---|---|---|---|
+| `VITE_API_PROXY` | No | `0` | Con `1`, usa `/api` y `/video` solo si HTTPS local está configurado. |
+| `VITE_AWS_HOST` | No | `localhost` | Host DeepRacer para el streaming directo de cámara. |
+| `VITE_HTTPS_KEY` | No | Vacío | Ruta local a la clave para HTTPS de desarrollo/VR. |
+| `VITE_HTTPS_CERT` | No | Vacío | Ruta local al certificado correspondiente. |
+
+HTTPS y proxy requieren ambas rutas de certificado válidas. Sin ellas, Vite
+sirve HTTP y la app usa conexiones directas por defecto. No guardes certificados
+ni rutas privadas en Git. La plantilla está en `../../.env.example`.
 
 ## VR en Quest por LAN (HTTPS opcional)
 
