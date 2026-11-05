@@ -1,0 +1,103 @@
+name: Kiro review
+
+# Revisor de PRs con Kiro CLI en headless. Reemplaza al cron de la VM Oracle:
+# se dispara por evento, comenta como github-actions[bot] y publica un estado
+# de commit que la proteccion de rama puede exigir.
+#
+# Requiere el secreto KIRO_API_KEY (Kiro dashboard -> API keys).
+# Modelo: variable de repositorio KIRO_MODEL, por defecto claude-haiku-5.5.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: kiro-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Comprobar credencial
+        id: key
+        env:
+          K: ${{ secrets.KIRO_API_KEY }}
+        run: |
+          if [ -n "$K" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else
+            echo "ok=" >> "$GITHUB_OUTPUT"; echo "::notice::Falta el secreto KIRO_API_KEY"
+          fi
+
+      - name: Instalar Kiro CLI
+        if: steps.key.outputs.ok == '1'
+        run: |
+          curl -fsSL https://cli.kiro.dev/install | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Preparar prompt
+        if: steps.key.outputs.ok == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh pr view "$PR" --json title,body --template '# {{.title}}{{"\n"}}{{"\n"}}{{.body}}{{"\n"}}' > /tmp/meta.txt
+          gh pr diff "$PR" > /tmp/full.diff || true
+          head -c 90000 /tmp/full.diff > /tmp/diff.txt
+          {
+            cat tools/kiro-review/rules.md
+            echo
+            echo "=== PR #$PR ==="
+            cat /tmp/meta.txt
+            echo "=== DIFF (truncado a 90000 caracteres) ==="
+            cat /tmp/diff.txt
+          } > /tmp/prompt.txt
+          echo "prompt: $(wc -c < /tmp/prompt.txt) caracteres"
+
+      - name: Revisar
+        if: steps.key.outputs.ok == '1'
+        env:
+          KIRO_API_KEY: ${{ secrets.KIRO_API_KEY }}
+          KIRO_MODEL: ${{ vars.KIRO_MODEL || 'claude-haiku-5.5' }}
+        run: |
+          set -euo pipefail
+          kiro-cli chat --no-interactive --model "$KIRO_MODEL" --effort medium \
+            < /tmp/prompt.txt > /tmp/review.md
+          echo "review: $(wc -c < /tmp/review.md) caracteres"
+
+      - name: Publicar
+        if: steps.key.outputs.ok == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/review.md ]; then
+            echo "::warning::Kiro no devolvio texto; no se publica"
+            exit 0
+          fi
+          state=success
+          grep -q 'VEREDICTO: Major' /tmp/review.md && state=failure
+          {
+            echo "## Revisor Kiro"
+            echo
+            cat /tmp/review.md
+          } > /tmp/body.md
+          gh pr comment "$PR" --body-file /tmp/body.md
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+            -f state="$state" \
+            -f context="kiro-review" \
+            -f description="Revision automatica de Kiro"
+          echo "estado: $state"
