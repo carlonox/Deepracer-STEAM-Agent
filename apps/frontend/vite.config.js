@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    define: {
+      "import.meta.env.VITE_API_PROXY": JSON.stringify(useProxy ? "1" : "0"),
+    },
     envDir: "../..", // Configuración compartida desde el .env de la raíz.
     server: {
       host: '0.0.0.0', // Permitir conexiones desde cualquier IP

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { getCameraStreamUrl } from "../config/frontend";
 
 export default function useQuestVRInput() {
   const [isSupported, setIsSupported] = useState(null); // null = checking, true/false = result
@@ -80,7 +81,6 @@ export default function useQuestVRInput() {
 
   const startSession = useCallback(async (display = "vr") => {
     if (!navigator.xr) {
-      console.error("WebXR not available");
       setXrStatus("sin navigator.xr (¿HTTP?)");
       return false;
     }
@@ -99,13 +99,11 @@ export default function useQuestVRInput() {
       }
 
       if (!sessionType) {
-        console.log('🥽 WebXR: No immersive session type supported');
         setXrStatus("sin sesión inmersiva (vr/ar no soportado)");
         return false;
       }
       const isAR = sessionType === "immersive-ar";
 
-      console.log(`🥽 WebXR: Starting ${sessionType} session...`);
       setXrStatus(`pidiendo ${sessionType}…`);
       const session = await navigator.xr.requestSession(sessionType, {
         optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
@@ -114,10 +112,8 @@ export default function useQuestVRInput() {
       sessionRef.current = session;
       setIsSessionActive(true);
       setXrStatus("sesión ok · montando GL…");
-      console.log("✅ WebXR session started");
 
       session.addEventListener("end", () => {
-        console.log("🥽 WebXR: Session ended");
         sessionRef.current = null;
         setXrStatus("sesión terminada");
         try { glRef.current?.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* noop */ }
@@ -140,11 +136,7 @@ export default function useQuestVRInput() {
 
       // Render mínimo: una sesión inmersiva SIN capa WebGL queda en negro.
       // Dibujamos la cámara del robot + un HUD (modo, gatillos, mando).
-      const useProxy = import.meta.env.VITE_API_PROXY === "1";
-      const awsHost = import.meta.env.VITE_AWS_HOST || "localhost";
-      const camUrl = useProxy
-        ? "/video/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85"
-        : `http://${awsHost}:8080/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85`;
+      const camUrl = getCameraStreamUrl();
       // En AR no se carga la cámara: ves el cuarto directo (cero lag,
       // máxima nitidez) y solo flota el HUD.
       const camImg = new Image();

@@ -3,11 +3,14 @@ import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 export default function KeyboardControls({ pressedKeys, onKeyPress, onKeyRelease }) {
   const isPressed = (keys) => keys.some((k) => pressedKeys.has(k));
 
-  const KeyButton = ({ keys, label }) => {
+  const KeyButton = ({ keys, icon, label }) => {
     const pressed = isPressed(keys);
     return (
       <button
-        className={`btn btn-square btn-lg ${pressed ? 'btn-primary' : 'btn-outline'} transition-all`}
+        type="button"
+        className={`keyboard-key ${pressed ? 'key-pressed' : ''}`}
+        aria-label={`Control ${label}`}
+        aria-pressed={pressed}
         onMouseDown={(e) => { e.preventDefault(); onKeyPress(keys[0]); }}
         onMouseUp={(e) => { e.preventDefault(); onKeyRelease(keys[0]); }}
         onMouseLeave={(e) => { e.preventDefault(); onKeyRelease(keys[0]); }}
@@ -16,7 +19,7 @@ export default function KeyboardControls({ pressedKeys, onKeyPress, onKeyRelease
         onTouchCancel={(e) => { e.preventDefault(); onKeyRelease(keys[0]); }}
       >
         <div className="flex flex-col items-center gap-1">
-          <Icon className="w-5 h-5" />
+          {icon}
           <span className="text-xs">{label}</span>
         </div>
       </button>
@@ -24,14 +27,14 @@ export default function KeyboardControls({ pressedKeys, onKeyPress, onKeyRelease
   };
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="flex justify-center">
-        <KeyButton keys={['ArrowUp', 'w', 'W']} icon={ChevronUp} label="W" />
+    <div className="keyboard-pad">
+      <div className="keyboard-row">
+        <KeyButton keys={['ArrowUp', 'w', 'W']} icon={<ChevronUp className="w-5 h-5" />} label="W" />
       </div>
-      <div className="flex gap-2">
-        <KeyButton keys={['ArrowLeft', 'a', 'A']} icon={ChevronLeft} label="A" />
-        <KeyButton keys={['ArrowDown', 's', 'S']} icon={ChevronDown} label="S" />
-        <KeyButton keys={['ArrowRight', 'd', 'D']} icon={ChevronRight} label="D" />
+      <div className="keyboard-row">
+        <KeyButton keys={['ArrowLeft', 'a', 'A']} icon={<ChevronLeft className="w-5 h-5" />} label="A" />
+        <KeyButton keys={['ArrowDown', 's', 'S']} icon={<ChevronDown className="w-5 h-5" />} label="S" />
+        <KeyButton keys={['ArrowRight', 'd', 'D']} icon={<ChevronRight className="w-5 h-5" />} label="D" />
       </div>
     </div>
   );

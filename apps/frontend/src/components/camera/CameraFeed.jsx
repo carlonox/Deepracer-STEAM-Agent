@@ -1,17 +1,16 @@
 import { useRef, useState, useEffect } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import { getCameraStreamUrl } from '../../config/frontend';
 
-
-export default function CameraFeed() {
+export default function CameraFeed({ onStatusChange }) {
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const AWS_HOST = import.meta.env.VITE_AWS_HOST || "localhost";
-  // Con VITE_API_PROXY=1 el MJPEG va por mismo origen (/video/...) y vite
-  // lo proxea al robot (evita mixed-content bajo HTTPS).
-  const cameraUrl =
-    import.meta.env.VITE_API_PROXY === "1"
-      ? `/video/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85`
-      : `http://${AWS_HOST}:8080/stream?topic=/camera_pkg/display_mjpeg&width=480&height=360&quality=85`;
+  const [cameraStatus, setCameraStatus] = useState('connecting');
+  const cameraUrl = getCameraStreamUrl();
+
+  useEffect(() => {
+    onStatusChange?.(cameraStatus);
+  }, [cameraStatus, onStatusChange]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -30,27 +29,27 @@ export default function CameraFeed() {
   };
 
   return (
-    <div 
-      ref={containerRef} 
-      className={`relative group ${
-        isFullscreen ? 'w-screen h-screen bg-black flex items-center justify-center' : 'flex justify-center'
-      }`}
+    <div
+      ref={containerRef}
+      className={`camera-feed ${isFullscreen ? 'camera-fullscreen' : ''}`}
     >
       <img
         src={cameraUrl}
         alt="DeepRacer Camera Feed"
-        className={isFullscreen 
-          ? 'max-w-full max-h-full object-contain' 
-          : 'rounded-xl shadow-lg max-w-full'
-        }
-        style={isFullscreen ? { width: '100%', height: '100%', objectFit: 'contain' } : {}}
+        onLoad={() => setCameraStatus('connected')}
+        onError={() => setCameraStatus('error')}
       />
-      <button 
+      {cameraStatus !== 'connected' && (
+        <p className="camera-message" role="status">
+          {cameraStatus === 'error' ? 'No se pudo conectar con la cámara.' : 'Conectando con la cámara…'}
+        </p>
+      )}
+      <button
+        type="button"
         onClick={toggleFullscreen}
-        className={`absolute top-2 right-2 btn btn-sm btn-circle btn-ghost bg-base-100/70 transition-opacity ${
-          isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-        }`}
+        className="camera-fullscreen-button"
         title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+        aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
       >
         {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
       </button>
