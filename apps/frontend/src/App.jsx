@@ -28,7 +28,7 @@ function App() {
     [notify],
   );
   useGamepad(manualMode, gamepadMode, maxSpeed, setMaxSpeed, reportControlError);
-  const { pressedKeys } = useKeyboard(true, maxSpeed, reportControlError);
+  const { pressedKeys } = useKeyboard(manualMode, maxSpeed, reportControlError);
   const {
     leftController,
     rightController,
