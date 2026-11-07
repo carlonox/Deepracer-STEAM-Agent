@@ -17,6 +17,13 @@ export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange, onErr
   const lastCommandRef = useRef({ angle: 0, throttle: 0 });
   const lastBumperStateRef = useRef({ lb: false, rb: false });
 
+  // Velocidad vigente en un ref: el cleanup de desmontaje la necesita sin
+  // reejecutar el efecto cada vez que cambia maxSpeed.
+  const maxSpeedRef = useRef(maxSpeed);
+  useEffect(() => {
+    maxSpeedRef.current = maxSpeed;
+  }, [maxSpeed]);
+
   const AXIS_DEAD_ZONE = 0.15;
   const TRIGGER_DEAD_ZONE = 0.05;
   const SPEED_STEP = 0.05;
@@ -34,7 +41,11 @@ export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange, onErr
         startUpdateLoop();
       }
     };
-    const handleDisconnect = () => {
+    const handleDisconnect = (e) => {
+      var desconectado = e && e.gamepad ? e.gamepad.index : null;
+      if (desconectado !== null && gamepadIndexRef.current !== null && desconectado !== gamepadIndexRef.current) {
+        return;
+      }
       gamepadIndexRef.current = null;
       setIsConnected(false);
       if (animationIdRef.current) {
@@ -165,6 +176,16 @@ export default function useGamepad(enabled, mode, maxSpeed, onSpeedChange, onErr
       }
     };
   }, [enabled, mode, maxSpeed, onSpeedChange, onError]);
+
+  // Parada al desmontar: si el mando quedaba desviado, el último comando
+  // seguiría vivo en el robot hasta el watchdog.
+  useEffect(() => {
+    return () => {
+      if (gamepadIndexRef.current !== null) {
+        sendManualCommand(0, 0, maxSpeedRef.current).catch(function () {});
+      }
+    };
+  }, []);
 
   return { isConnected };
 }
